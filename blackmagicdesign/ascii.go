@@ -106,11 +106,6 @@ func trimLeft(b []byte) []byte {
 	return bytes.TrimLeft(b, whitespaces)
 }
 
-// trim whitespaces around s
-func trimRight(b []byte) []byte {
-	return bytes.TrimRight(b, whitespaces)
-}
-
 // uppercase does an in-place ASCII-only uppercase conversion of b
 func uppercase(b []byte) {
 	for i := 0; i < len(b); i++ {

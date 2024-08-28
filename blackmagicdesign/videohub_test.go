@@ -407,12 +407,14 @@ END PRELUDE:
 	defer endpoint.Close()
 	addr := endpoint.Addr().String()
 	go func() {
-		conn, err := endpoint.Accept()
-		if err != nil {
-			t.Fatal(err)
+		for {
+			conn, err := endpoint.Accept()
+			if err != nil {
+				return
+			}
+			conn.Write(smoke)
+			conn.Close()
 		}
-		conn.Write(smoke)
-		conn.Close()
 	}()
 	v, err := blackmagicdesign.VideohubDial(addr)
 	if err != nil {
