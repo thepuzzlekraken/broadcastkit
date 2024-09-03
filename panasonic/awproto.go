@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/netip"
 	"net/url"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -19,10 +20,10 @@ import (
 type awHint int
 
 const (
-	awPtz awHint = 1 << iota // expected over aw_ptz interface
-	awCam                    // expected over aw_cam interface
-	awNty                    // expected over notifications interface
-	awHintMax
+	awPtz       awHint = 1 << iota // expected over aw_ptz interface
+	awCam                          // expected over aw_cam interface
+	awNty                          // expected over notifications interface
+	awHintCount awHint = 3
 )
 
 // AWResponse is the interface implemented by all responses sent from a camera.
@@ -148,21 +149,20 @@ type awResponseFactory struct {
 }
 
 // awRequestTable is the factory lookup table for AWRequests
-var awRequestTable = [awHintMax][]awRequestFactory{}
+var awRequestTable = [awHintCount][]awRequestFactory{}
 
 // awResponseTable is the factory lookup table for AWResponses
-var awResponseTable = [awHintMax][]awResponseFactory{}
+var awResponseTable = [awHintCount][]awResponseFactory{}
 
 // registerRequest registers a new request type with the factory table
 func registerRequest(new func() AWRequest) {
 	// TODO(zsh): These functions may be optimized away by code-generation instead.
 	n := new()
 	f, p := n.requestSignature()
-	for i := range awHintMax {
+	for i := range awHintCount {
 		m := 1 << i
 		if int(f)&m != 0 {
 			awRequestTable[i] = append(awRequestTable[i], awRequestFactory{p, new})
-			return
 		}
 	}
 }
@@ -172,11 +172,10 @@ func registerResponse(new func() AWResponse) {
 	// TODO(zsh): These functions may be optimized away by code-generation instead.
 	n := new()
 	f, p := n.responseSignature()
-	for i := range awHintMax {
+	for i := range awHintCount {
 		m := 1 << i
 		if int(f)&m != 0 {
 			awResponseTable[i] = append(awResponseTable[i], awResponseFactory{p, new})
-			return
 		}
 	}
 }
@@ -186,7 +185,7 @@ func newRequest(hint awHint, cmd string) AWRequest {
 	// This function is within a latency-critical path of incoming requests.
 	// Following is a tight-loop with everything inlined, but this may need
 	// optimization if latency becomes an issue.
-	for i := range awHintMax {
+	for i := range awHintCount {
 		m := 1 << i
 		if int(hint)&m == 0 {
 			continue
@@ -209,11 +208,13 @@ func newRequest(hint awHint, cmd string) AWRequest {
 func newResponse(hint awHint, cmd string) AWResponse {
 	// This function is less critical than newRequest(), because the object
 	// returned by AWRequest.Response() is used in happy-path response creation.
-	for i := range awHintMax {
+	for i := range awHintCount {
 		m := 1 << i
 		if int(hint)&m == 0 {
 			continue
 		}
+		debug := awResponseTable
+		_ = debug
 		for _, e := range awResponseTable[i] {
 			if match(e.sig, cmd) {
 				res := e.new()
@@ -225,122 +226,6 @@ func newResponse(hint awHint, cmd string) AWResponse {
 	return &AWUnknownResponse{
 		hint: hint,
 		text: cmd,
-	}
-}
-
-// tcpUnwrap peels out the string command from a tcp connection buffer
-func tcpUnwrap(b []byte) (string, error) {
-	if len(b) < 24 {
-		return "", fmt.Errorf("panasonic.tcpUnwrap: data too short %d (expected >=24)", len(b))
-	}
-	var l uint16
-	_, err := binary.Decode(b[22:24], binary.BigEndian, &l)
-	if err != nil {
-		return "", fmt.Errorf("panasonic.tcpUnwrap: invalid length data: %w", err)
-	}
-	l -= 8
-	dl := (22 + 2 + 4 + int(l) + 24)
-	if len(b) != dl {
-		return "", fmt.Errorf("panasonic.tcpUnwrap: data length mismatch %d (expected %d)", len(b), dl)
-	}
-
-	return string(trim(b[30 : 30+l])), nil
-}
-
-// awListener is the go routine loop that keeps accepting incoming notifications
-// listener is the net.Listener to be used
-// camaddr is the source address of notifications
-// ch is the channel to send AWResponses to
-func awListener(listener net.Listener, camaddr netip.Addr, ch chan<- AWResponse) {
-	defer listener.Close()
-	defer close(ch)
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			return
-		}
-
-		addr, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
-		remaddr, _ := netip.ParseAddr(addr)
-		if remaddr != camaddr {
-			conn.Close()
-			continue
-		}
-
-		conn.SetDeadline(time.Now().Add(1 * time.Second))
-		b, err := io.ReadAll(conn)
-		conn.Close()
-		if err != nil {
-			continue
-		}
-
-		cmd, err := tcpUnwrap(b)
-		if err != nil {
-			continue
-		}
-
-		ch <- newResponse(awNty, cmd)
-	}
-}
-
-// AWErrNo is the error number used by the Panasonic AW protocol
-type AWErrNo int
-
-const (
-	AWErrUnsupported  AWErrNo = 1 // The command is not understood by the device
-	AWErrBusy         AWErrNo = 2 // The device is not ready for the command
-	AWErrUnacceptable AWErrNo = 3 // The command values are not acceptable
-	// Numbers higher than 3 are unused, we parse them for future-proofing only
-)
-
-// AWError is a response indicating error reported by the Panasonic device
-type AWError struct {
-	cap  bool
-	No   AWErrNo // The error number reported
-	Flag string  // The textual flag reported (usually the begining of command)
-}
-
-func (e *AWError) Ok() bool {
-	return false
-}
-func (e *AWError) responseSignature() (awHint, string) {
-	sig := "\x03R\x01:\x00\x00\x00"
-	return awPtz | awCam, sig[0:min(4+len(e.Flag), 7)]
-}
-func (e *AWError) unpackResponse(s string) {
-	e.cap = s[0] == 'E'
-	e.No = AWErrNo(dec2int(s[2:3]))
-	e.Flag = s[4:]
-}
-func (e *AWError) packResponse() string {
-	if e.cap {
-		return "ER" + int2dec(int(e.No), 1) + ":" + e.Flag
-	}
-	return "eR" + int2dec(int(e.No), 1) + ":" + e.Flag
-}
-func init() {
-	// All commands are fixed length, except for errors which take up to 3 chars
-	// we just register it 4 times so we don't need to teach the match enginge
-	// about variable-length responses
-	registerResponse(func() AWResponse { return &AWError{Flag: ""} })
-	registerResponse(func() AWResponse { return &AWError{Flag: " "} })
-	registerResponse(func() AWResponse { return &AWError{Flag: "  "} })
-	registerResponse(func() AWResponse { return &AWError{Flag: "   "} })
-}
-
-// Error implements the error interface
-// This is so that Panasonic protocol errors can be returned both via AWResponse
-// and via the go standard error interface
-func (e *AWError) Error() string {
-	switch e.No {
-	case AWErrUnsupported:
-		return fmt.Sprintf("unsupported AW command (%s)", e.Flag)
-	case AWErrBusy:
-		return fmt.Sprintf("busy status for AW command (%s)", e.Flag)
-	case AWErrUnacceptable:
-		return fmt.Sprintf("unacceptable value for AW command (%s)", e.Flag)
-	default:
-		return fmt.Sprintf("unknown error (%d) for AW command (%s)", e.No, e.Flag)
 	}
 }
 
@@ -382,9 +267,7 @@ type Camera struct {
 	httpOnce sync.Once
 }
 
-// httpInit sets good defaults of the Http client for the AW protocol
-//
-// Called via httpOnce.Do(..) before the first request.
+// httpInit sets good defaults of the Http client for the quirks in AW protocol
 func (c *Camera) httpInit() {
 	if c.Http.CheckRedirect == nil {
 		c.Http.CheckRedirect = func(req *http.Request, via []*http.Request) error {
@@ -396,6 +279,7 @@ func (c *Camera) httpInit() {
 	}
 }
 
+// httpGet does an http.Get to the camera with the quirks of the AW protocol
 func (c *Camera) httpGet(path string, query string) (*http.Response, error) {
 	c.httpOnce.Do(c.httpInit)
 	return c.Http.Do(&http.Request{
@@ -417,13 +301,16 @@ func (c *Camera) httpGet(path string, query string) (*http.Response, error) {
 	})
 }
 
+// strCommand sends a command string to the camera over the http transport
 func (c *Camera) strCommand(hint awHint, cmd string) (string, error) {
 	var path string
 
 	if hint&awPtz != 0 {
 		path = "/cgi-bin/aw_ptz"
-	} else {
+	} else if hint&awCam != 0 {
 		path = "/cgi-bin/aw_cam"
+	} else {
+		return "", fmt.Errorf("this command %v")
 	}
 
 	res, err := c.httpGet(path, "cmd="+cmd+"&res=1")
@@ -469,37 +356,174 @@ func (c *Camera) Command(req AWRequest) (AWResponse, error) {
 	return res, nil
 }
 
-func (c *Camera) Notify(ch chan<- AWResponse) (stop func(), err error) {
-	c.httpOnce.Do(c.httpInit)
-
+func (c *Camera) UpdateListener() (*CameraUpdateListener, error) {
+	listener, err := net.ListenTCP("tcp4", &net.TCPAddr{})
 	if err != nil {
-		close(ch)
 		return nil, &NetworkError{err}
 	}
+	return &CameraUpdateListener{
+		lis: listener,
+		cam: c,
+	}, nil
+}
 
-	listener, err := net.Listen("tcp4", "0.0.0.0:0")
-	if err != nil {
-		close(ch)
-		return nil, &NetworkError{err}
+// notifyUnpack retrieves a string response from the notification container
+//
+// This function ignores the undocumented metadata within the container.
+// Format is:
+// - 22 bytes reserved
+// -  4 bytes of length, encoded as (l + 8) in uint16 big endian
+// -  l bytes of string data (surrounded by CRLF)
+// - 24 bytes reserved
+//
+// It is observed that string data sometimes have trailing null bytes. This
+// function trims the string to printable ASCII characters.
+func notifyUnpack(b []byte) (string, error) {
+	if len(b) < 24 {
+		return "", fmt.Errorf("panasonic.notifyUnpack: data too short %d (expected >=24)", len(b))
 	}
-	stop = func() {
-		listener.Close()
+	var l uint16
+	_, err := binary.Decode(b[22:24], binary.BigEndian, &l)
+	if err != nil {
+		return "", fmt.Errorf("panasonic.tcpUnwrap: invalid length data: %w", err)
+	}
+	l -= 8
+	dl := (22 + 2 + 4 + int(l) + 24)
+	if len(b) != dl {
+		return "", fmt.Errorf("panasonic.tcpUnwrap: data length mismatch %d (expected %d)", len(b), dl)
 	}
 
-	go awListener(listener, c.Addr, ch)
+	return string(trim(b[30 : 30+l])), nil
+}
 
-	_, port, _ := net.SplitHostPort(listener.Addr().String())
-	res, err := c.httpGet("/cgi-bin/event", "connect=start&my_port="+port+"&uid=0")
+// notifyPack packages a string response into the notification container
+//
+// In addition to the documented format, this function guesses the undocumented
+// bytes. Format is:
+// -  4 bytes source IP
+// -  2 bytes counter, which starts at 1, incremented for each packet
+// -  6 bytes date, encoded as uint8 each: YEAR (last two decimal digits), MONTH, DAY, HOUR, MINUTE, SECOND
+// - 10 bytes constant, hex 00 01 00 80 00 00 00 00 00 01
+// -  2 bytes length, encoded as (l + 8) in uint16 big endian
+// -  4 bytes constant, hex 01 00 00 00
+// -  l bytes string data (surrounded by CRLF)
+// -  4 bytes constant, hex 00 02 00 18
+// -  6 bytes source MAC
+// -  2 bytes constant, hex 00 01
+// -  6 bytes date, same as above
+// -  6 bytes constant 00 00 00 00 00 00
+// Date is in local time of the camera, not UTC.
+func notifyPack(response string, counter uint16, camIP netip.Addr, camMAC net.HardwareAddr, date time.Time) []byte {
+	// Surround the response with CRLF fluff
+	// TODO(zsh): Should we mimick the 0-padding quirks of the camera?
+	data := make([]byte, len(response)+4)
+	data[0] = '\r'
+	data[1] = '\n'
+	copy(data[2:], response)
+	data[len(data)-2] = '\r'
+	data[len(data)-1] = '\n'
 
+	// Create the data packet as described above
+	f := 4 + 2 + 6 + 10 + 2 + 4 + len(data) + 4 + 6 + 2 + 6 + 6
+	b := make([]byte, f)
+	_ = b[28]
+	copy(b, camIP.AsSlice())
+	binary.BigEndian.PutUint16(b[4:], counter)
+	b[6] = uint8(date.Year() % 100)
+	b[7] = uint8(date.Month())
+	b[8] = uint8(date.Day())
+	b[9] = uint8(date.Hour())
+	b[10] = uint8(date.Minute())
+	b[11] = uint8(date.Second())
+	copy(b[12:], []byte{0x00, 0x01, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01})
+	binary.BigEndian.PutUint16(b[22:], uint16(len(data)+8))
+	copy(b[24:], []byte{0x01, 0x00, 0x00, 0x00})
+	copy(b[28:], data)
+	copy(b[f-25:f-21], []byte{0x00, 0x02, 0x00, 0x18})
+	copy(b[f-21:f-15], camMAC)
+	copy(b[f-15:f-13], []byte{0x00, 0x01})
+	copy(b[f-13:f-7], b[6:12])
+	copy(b[f-7:f-1], []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+
+	return b
+}
+
+type CameraUpdateListener struct {
+	once sync.Once
+	lis  *net.TCPListener
+	cam  *Camera
+}
+
+func (u *CameraUpdateListener) Start() error {
+	port := netip.MustParseAddrPort(u.lis.Addr().String()).Port()
+	res, err := u.cam.httpGet("/cgi-bin/event", "connect=start&my_port="+strconv.Itoa(int(port))+"&uid=0")
 	if err != nil {
-		stop()
-		return nil, &NetworkError{err}
+		return &NetworkError{err}
 	}
 	if res.StatusCode != http.StatusNoContent {
-		stop()
-		err := fmt.Errorf("http status code: %d (expected %d)", res.StatusCode, http.StatusNoContent)
+		return &NetworkError{fmt.Errorf("http status code: %d (expected %d)", res.StatusCode, http.StatusNoContent)}
+	}
+	return nil
+}
+
+func (u *CameraUpdateListener) Stop() error {
+	port := netip.MustParseAddrPort(u.lis.Addr().String()).Port()
+	res, err := u.cam.httpGet("/cgi-bin/event", "connect=start&my_port="+strconv.Itoa(int(port))+"&uid=0")
+	if err != nil {
+		return &NetworkError{err}
+	}
+	if res.StatusCode != http.StatusNoContent {
+		return &NetworkError{fmt.Errorf("http status code: %d (expected %d)", res.StatusCode, http.StatusNoContent)}
+	}
+	return nil
+}
+
+func (u *CameraUpdateListener) Addr() netip.AddrPort {
+	return netip.MustParseAddrPort(u.lis.Addr().String())
+}
+
+func (u *CameraUpdateListener) acceptTCP() (*net.TCPConn, error) {
+	camaddr := u.cam.Addr
+	for {
+		conn, err := u.lis.AcceptTCP()
+		if err != nil {
+			return nil, err
+		}
+
+		remaddr := netip.MustParseAddrPort(conn.RemoteAddr().String()).Addr()
+		if remaddr == camaddr {
+			return conn, nil
+		}
+
+		conn.Close()
+	}
+}
+
+func (u *CameraUpdateListener) Accept() (AWResponse, error) {
+	u.once.Do(func() { u.Start() })
+
+	conn, err := u.acceptTCP()
+	if err != nil {
 		return nil, &NetworkError{err}
 	}
 
-	return stop, nil
+	conn.SetDeadline(time.Now().Add(1 * time.Second))
+	b, err := io.ReadAll(conn)
+	conn.Close()
+
+	if err != nil {
+		return nil, &NetworkError{err}
+	}
+
+	cmd, err := notifyUnpack(b)
+	if err != nil {
+		return nil, &NetworkError{err}
+	}
+
+	return newResponse(awNty, cmd), nil
+}
+
+func (u *CameraUpdateListener) Close() error {
+	_ = u.Stop()
+	return u.lis.Close()
 }
