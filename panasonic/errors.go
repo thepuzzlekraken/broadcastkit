@@ -37,10 +37,10 @@ func (e *AWError) Error() string {
 func (e *AWError) Ok() bool {
 	return false
 }
-func (e *AWError) responseSignature() (awHint, string) {
+func (e *AWError) responseSignature() string {
 	sig := "\x03R\x01:\x00\x00\x00"
 	// return the correct-length pattern depending on flag length
-	return awPtz | awCam, sig[0:min(4+len(e.Flag), 7)]
+	return sig[0:min(4+len(e.Flag), 7)]
 }
 func (e *AWError) unpackResponse(s string) {
 	e.cap = s[0] == 'E'
@@ -60,4 +60,27 @@ func init() {
 	registerResponse(func() AWResponse { return &AWError{Flag: " "} })
 	registerResponse(func() AWResponse { return &AWError{Flag: "  "} })
 	registerResponse(func() AWResponse { return &AWError{Flag: "   "} })
+}
+
+// NewAWError creates an AWError as a Panasonic device would.
+// This is intended for simulating errors as a proxy or virtual device.
+func NewAWError(n AWErrNo, c AWRequest) *AWError {
+	t := c.packRequest()
+	return &AWError{
+		cap:  len(t) > 0 && t[0] != '#',
+		No:   n,
+		Flag: t[:min(len(t), 3)],
+	}
+}
+
+// NetworkError is an error condition outside of the Panasonic protocol
+type NetworkError struct {
+	parent error
+}
+
+func (e *NetworkError) Error() string {
+	return fmt.Sprintf("panasonic network failure: %s", e.parent.Error())
+}
+func (e *NetworkError) Unwrap() error {
+	return e.parent
 }

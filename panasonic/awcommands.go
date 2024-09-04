@@ -26,8 +26,8 @@ func (a *AWPower) Acceptable() bool {
 func (a *AWPower) Response() AWResponse {
 	return a
 }
-func (a *AWPower) requestSignature() (awHint, string) {
-	return awPtz, "#O\x00"
+func (a *AWPower) requestSignature() string {
+	return "#O\x00"
 }
 func (a *AWPower) unpackRequest(cmd string) {
 	c := cmd[2]
@@ -59,8 +59,8 @@ func (a *AWPower) packRequest() string {
 func (a *AWPower) Ok() bool {
 	return true
 }
-func (a *AWPower) responseSignature() (awHint, string) {
-	return awPtz | awNty, "p\x00"
+func (a *AWPower) responseSignature() string {
+	return "p\x00"
 }
 func (a *AWPower) unpackResponse(cmd string) {
 	a.Power = PowerSwitch(cmd[1])
@@ -86,8 +86,8 @@ func (a *AWPowerQuery) Acceptable() bool {
 func (a *AWPowerQuery) Response() AWResponse {
 	return &AWPower{}
 }
-func (a *AWPowerQuery) requestSignature() (awHint, string) {
-	return awPtz, "#O"
+func (a *AWPowerQuery) requestSignature() string {
+	return "#O"
 }
 func (a *AWPowerQuery) unpackRequest(_ string) {}
 func (a *AWPowerQuery) packRequest() string {
@@ -121,8 +121,8 @@ func (a *AWInstall) Acceptable() bool {
 func (a *AWInstall) Response() AWResponse {
 	return a
 }
-func (a *AWInstall) requestSignature() (awHint, string) {
-	return awPtz, "#INS\x02"
+func (a *AWInstall) requestSignature() string {
+	return "#INS\x02"
 }
 func (a *AWInstall) unpackRequest(cmd string) {
 	a.Position = InstallSwitch(dec2int(cmd[4:5]))
@@ -133,8 +133,8 @@ func (a *AWInstall) packRequest() string {
 func (a *AWInstall) Ok() bool {
 	return true
 }
-func (a *AWInstall) responseSignature() (awHint, string) {
-	return awPtz | awNty, "iNS\x02"
+func (a *AWInstall) responseSignature() string {
+	return "iNS\x02"
 }
 func (a *AWInstall) unpackResponse(cmd string) {
 	a.Position = InstallSwitch(dec2int(cmd[3:4]))
@@ -155,8 +155,8 @@ func (a *AWInstallQuery) Acceptable() bool {
 func (a *AWInstallQuery) Response() AWResponse {
 	return &AWInstall{}
 }
-func (a *AWInstallQuery) requestSignature() (awHint, string) {
-	return awPtz, "#INS"
+func (a *AWInstallQuery) requestSignature() string {
+	return "#INS"
 }
 func (a *AWInstallQuery) unpackRequest(_ string) {}
 func (a *AWInstallQuery) packRequest() string {
@@ -198,8 +198,8 @@ func (a *AWPanTiltTo) Acceptable() bool {
 func (a *AWPanTiltTo) Response() AWResponse {
 	return a
 }
-func (a *AWPanTiltTo) requestSignature() (awHint, string) {
-	return awPtz, "#APC\x01\x01\x01\x01\x01\x01\x01\x01"
+func (a *AWPanTiltTo) requestSignature() string {
+	return "#APC\x01\x01\x01\x01\x01\x01\x01\x01"
 }
 func (a *AWPanTiltTo) unpackRequest(cmd string) {
 	_ = cmd[11]
@@ -212,9 +212,9 @@ func (a *AWPanTiltTo) packRequest() string {
 func (a *AWPanTiltTo) Ok() bool {
 	return true
 }
-func (a *AWPanTiltTo) responseSignature() (awHint, string) {
+func (a *AWPanTiltTo) responseSignature() string {
 	// #APC not supported in awNty notifications unfortunately
-	return awPtz, "aPC\x01\x01\x01\x01\x01\x01\x01\x01"
+	return "aPC\x01\x01\x01\x01\x01\x01\x01\x01"
 }
 func (a *AWPanTiltTo) unpackResponse(cmd string) {
 	_ = cmd[10]
@@ -239,8 +239,8 @@ func (a *AWPanTiltQuery) Acceptable() bool {
 func (a *AWPanTiltQuery) Response() AWResponse {
 	return &AWPanTiltTo{}
 }
-func (a *AWPanTiltQuery) requestSignature() (awHint, string) {
-	return awPtz, "#APC"
+func (a *AWPanTiltQuery) requestSignature() string {
+	return "#APC"
 }
 func (a *AWPanTiltQuery) unpackRequest(_ string) {}
 func (a *AWPanTiltQuery) packRequest() string {
@@ -307,8 +307,8 @@ func (a *AWPanTiltSpeedTo) Acceptable() bool {
 func (a *AWPanTiltSpeedTo) Response() AWResponse {
 	return a
 }
-func (a *AWPanTiltSpeedTo) requestSignature() (awHint, string) {
-	return awPtz, "#APS\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x02"
+func (a *AWPanTiltSpeedTo) requestSignature() string {
+	return "#APS\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x02"
 }
 func (a *AWPanTiltSpeedTo) unpackRequest(cmd string) {
 	_ = cmd[14]
@@ -322,9 +322,9 @@ func (a *AWPanTiltSpeedTo) packRequest() string {
 func (a *AWPanTiltSpeedTo) Ok() bool {
 	return true
 }
-func (a *AWPanTiltSpeedTo) responseSignature() (awHint, string) {
+func (a *AWPanTiltSpeedTo) responseSignature() string {
 	// #APS not supported in awNty notifications unfortunately
-	return awPtz, "aPS\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x02"
+	return "aPS\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x02"
 }
 func (a *AWPanTiltSpeedTo) unpackResponse(cmd string) {
 	_ = cmd[13]
@@ -351,8 +351,8 @@ func (a *AWPanTiltBy) Acceptable() bool {
 func (a *AWPanTiltBy) Response() AWResponse {
 	return a
 }
-func (a *AWPanTiltBy) requestSignature() (awHint, string) {
-	return awPtz, "#RPC\x01\x01\x01\x01\x01\x01\x01\x01"
+func (a *AWPanTiltBy) requestSignature() string {
+	return "#RPC\x01\x01\x01\x01\x01\x01\x01\x01"
 }
 func (a *AWPanTiltBy) unpackRequest(cmd string) {
 	_ = cmd[11]
@@ -365,9 +365,9 @@ func (a *AWPanTiltBy) packRequest() string {
 func (a *AWPanTiltBy) Ok() bool {
 	return true
 }
-func (a *AWPanTiltBy) responseSignature() (awHint, string) {
+func (a *AWPanTiltBy) responseSignature() string {
 	// #RPC not supported in awNty notifications unfortunately
-	return awPtz, "rPC\x01\x01\x01\x01\x01\x01\x01\x01"
+	return "rPC\x01\x01\x01\x01\x01\x01\x01\x01"
 }
 func (a *AWPanTiltBy) unpackResponse(cmd string) {
 	_ = cmd[10]
@@ -394,8 +394,8 @@ func (a *AWPanTiltSpeedBy) Acceptable() bool {
 func (a *AWPanTiltSpeedBy) Response() AWResponse {
 	return a
 }
-func (a *AWPanTiltSpeedBy) requestSignature() (awHint, string) {
-	return awPtz, "#RPS\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x02"
+func (a *AWPanTiltSpeedBy) requestSignature() string {
+	return "#RPS\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x02"
 }
 func (a *AWPanTiltSpeedBy) unpackRequest(cmd string) {
 	_ = cmd[14]
@@ -409,9 +409,9 @@ func (a *AWPanTiltSpeedBy) packRequest() string {
 func (a *AWPanTiltSpeedBy) Ok() bool {
 	return true
 }
-func (a *AWPanTiltSpeedBy) responseSignature() (awHint, string) {
+func (a *AWPanTiltSpeedBy) responseSignature() string {
 	// #RPS not supported in awNty notifications
-	return awPtz, "rPS\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x02"
+	return "rPS\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x02"
 }
 func (a *AWPanTiltSpeedBy) unpackResponse(cmd string) {
 	_ = cmd[13]
@@ -464,8 +464,8 @@ func (a *AWPan) Acceptable() bool {
 func (a *AWPan) Response() AWResponse {
 	return a
 }
-func (a *AWPan) requestSignature() (awHint, string) {
-	return awPtz, "#P\x02\x02"
+func (a *AWPan) requestSignature() string {
+	return "#P\x02\x02"
 }
 func (a *AWPan) unpackRequest(cmd string) {
 	a.Pan = toInteractiveSpeed(cmd[2:4])
@@ -476,8 +476,8 @@ func (a *AWPan) packRequest() string {
 func (a *AWPan) Ok() bool {
 	return true
 }
-func (a *AWPan) responseSignature() (awHint, string) {
-	return awPtz, "pS\x02\x02"
+func (a *AWPan) responseSignature() string {
+	return "pS\x02\x02"
 }
 func (a *AWPan) unpackResponse(cmd string) {
 	a.Pan = toInteractiveSpeed(cmd[2:4])
@@ -501,8 +501,8 @@ func (a *AWTilt) Acceptable() bool {
 func (a *AWTilt) Response() AWResponse {
 	return a
 }
-func (a *AWTilt) requestSignature() (awHint, string) {
-	return awPtz, "#T\x02\x02"
+func (a *AWTilt) requestSignature() string {
+	return "#T\x02\x02"
 }
 func (a *AWTilt) unpackRequest(cmd string) {
 	a.Tilt = toInteractiveSpeed(cmd[2:4])
@@ -513,8 +513,8 @@ func (a *AWTilt) packRequest() string {
 func (a *AWTilt) Ok() bool {
 	return true
 }
-func (a *AWTilt) responseSignature() (awHint, string) {
-	return awPtz, "tS\x02\x02"
+func (a *AWTilt) responseSignature() string {
+	return "tS\x02\x02"
 }
 func (a *AWTilt) unpackResponse(cmd string) {
 	a.Tilt = toInteractiveSpeed(cmd[2:4])
@@ -540,8 +540,8 @@ func (a *AWPanTilt) Acceptable() bool {
 func (a *AWPanTilt) Response() AWResponse {
 	return a
 }
-func (a *AWPanTilt) requestSignature() (awHint, string) {
-	return awPtz, "#PTS\x02\x02\x02\x02"
+func (a *AWPanTilt) requestSignature() string {
+	return "#PTS\x02\x02\x02\x02"
 }
 func (a *AWPanTilt) unpackRequest(cmd string) {
 	_ = cmd[7]
@@ -554,8 +554,8 @@ func (a *AWPanTilt) packRequest() string {
 func (a *AWPanTilt) Ok() bool {
 	return true
 }
-func (a *AWPanTilt) responseSignature() (awHint, string) {
-	return awPtz, "pTS\x02\x02\x02\x02"
+func (a *AWPanTilt) responseSignature() string {
+	return "pTS\x02\x02\x02\x02"
 }
 func (a *AWPanTilt) unpackResponse(cmd string) {
 	_ = cmd[6]
@@ -604,8 +604,8 @@ func (a *AWZoomTo) Acceptable() bool {
 func (a *AWZoomTo) Response() AWResponse {
 	return a
 }
-func (a *AWZoomTo) requestSignature() (awHint, string) {
-	return awPtz, "#AXZ\x01\x01\x01"
+func (a *AWZoomTo) requestSignature() string {
+	return "#AXZ\x01\x01\x01"
 }
 func (a *AWZoomTo) unpackRequest(cmd string) {
 	a.Zoom = toScaleUnit(cmd[4:7])
@@ -613,8 +613,8 @@ func (a *AWZoomTo) unpackRequest(cmd string) {
 func (a *AWZoomTo) packRequest() string {
 	return "#AXZ" + a.Zoom.toWire()
 }
-func (a *AWZoomTo) responseSignature() (awHint, string) {
-	return awPtz, "aXZ\x01\x01\x01"
+func (a *AWZoomTo) responseSignature() string {
+	return "aXZ\x01\x01\x01"
 }
 func (a *AWZoomTo) unpackResponse(cmd string) {
 	a.Zoom = toScaleUnit(cmd[3:6])
@@ -633,8 +633,8 @@ func (a *AWZoomQuery) Acceptable() bool {
 func (a *AWZoomQuery) Response() AWResponse {
 	return &AWZoomTo{}
 }
-func (a *AWZoomQuery) requestSignature() (awHint, string) {
-	return awPtz, "#AXZ"
+func (a *AWZoomQuery) requestSignature() string {
+	return "#AXZ"
 }
 func (a *AWZoomQuery) unpackRequest(_ string) {}
 func (a *AWZoomQuery) packRequest() string {
@@ -653,10 +653,10 @@ func init() { registerResponse(func() AWResponse { return &AWZoomResponseAlterna
 func (a *AWZoomResponseAlternate) Ok() bool {
 	return true
 }
-func (a *AWZoomResponseAlternate) responseSignature() (awHint, string) {
+func (a *AWZoomResponseAlternate) responseSignature() string {
 	// There's a special case of gz--- which is returned instead of an eR2 error
 	// when the camera is suspended. We'll just let that for UnknownResponse.
-	return awPtz, "gz\x01\x01\x01"
+	return "gz\x01\x01\x01"
 }
 func (a *AWZoomResponseAlternate) unpackResponse(cmd string) {
 	a.Zoom = toScaleUnit(cmd[2:4])
@@ -679,8 +679,8 @@ func (a *AWZoomQueryAltenate) Acceptable() bool {
 func (a *AWZoomQueryAltenate) Response() AWResponse {
 	return &AWZoomResponseAlternate{}
 }
-func (a *AWZoomQueryAltenate) requestSignature() (awHint, string) {
-	return awPtz, "#GZ"
+func (a *AWZoomQueryAltenate) requestSignature() string {
+	return "#GZ"
 }
 func (a *AWZoomQueryAltenate) unpackRequest(cmd string) {}
 func (a *AWZoomQueryAltenate) packRequest() string {
@@ -700,8 +700,8 @@ func (a *AWZoom) Acceptable() bool {
 func (a *AWZoom) Response() AWResponse {
 	return a
 }
-func (a *AWZoom) requestSignature() (awHint, string) {
-	return awPtz, "#Z\x02\x02"
+func (a *AWZoom) requestSignature() string {
+	return "#Z\x02\x02"
 }
 func (a *AWZoom) unpackRequest(cmd string) {
 	a.Zoom = toInteractiveSpeed(cmd[2:4])
@@ -712,8 +712,8 @@ func (a *AWZoom) packRequest() string {
 func (a *AWZoom) Ok() bool {
 	return true
 }
-func (a *AWZoom) responseSignature() (awHint, string) {
-	return awPtz, "zS\x02\x02"
+func (a *AWZoom) responseSignature() string {
+	return "zS\x02\x02"
 }
 func (a *AWZoom) unpackResponse(cmd string) {
 	a.Zoom = toInteractiveSpeed(cmd[2:4])
@@ -747,8 +747,8 @@ func init() { registerResponse(func() AWResponse { return &AWPresetPlayback{} })
 func (a *AWPresetPlayback) Ok() bool {
 	return true
 }
-func (a *AWPresetPlayback) responseSignature() (awHint, string) {
-	return awNty, "q\x02\x02"
+func (a *AWPresetPlayback) responseSignature() string {
+	return "q\x02\x02"
 }
 func (a *AWPresetPlayback) unpackResponse(cmd string) {
 	a.Preset = toPreset(cmd[1:3])
@@ -793,8 +793,8 @@ func init() { registerResponse(func() AWResponse { return &AWLensInformation{} }
 func (a *AWLensInformation) Ok() bool {
 	return true
 }
-func (a *AWLensInformation) responseSignature() (awHint, string) {
-	return awNty | awPtz, "lPI\x01\x01\x01\x01\x01\x01\x01\x01\x01"
+func (a *AWLensInformation) responseSignature() string {
+	return "lPI\x01\x01\x01\x01\x01\x01\x01\x01\x01"
 }
 func (a *AWLensInformation) unpackResponse(cmd string) {
 	_ = cmd[11]
@@ -815,8 +815,8 @@ func (a *AWLensInformationQuery) Acceptable() bool {
 func (a *AWLensInformationQuery) Response() AWResponse {
 	return &AWLensInformation{}
 }
-func (a *AWLensInformationQuery) requestSignature() (awHint, string) {
-	return awPtz, "#LPI"
+func (a *AWLensInformationQuery) requestSignature() string {
+	return "#LPI"
 }
 func (a *AWLensInformationQuery) unpackRequest(_ string) {}
 func (a *AWLensInformationQuery) packRequest() string {
@@ -839,8 +839,8 @@ func (a *AWLensInformationNotify) Response() AWResponse {
 func (a *AWLensInformationNotify) Ok() bool {
 	return true
 }
-func (a *AWLensInformationNotify) requestSignature() (awHint, string) {
-	return awPtz, "#LPC\x02"
+func (a *AWLensInformationNotify) requestSignature() string {
+	return "#LPC\x02"
 }
 func (a *AWLensInformationNotify) unpackRequest(cmd string) {
 	a.Enabled = toToggle(cmd[4:5])
@@ -848,8 +848,8 @@ func (a *AWLensInformationNotify) unpackRequest(cmd string) {
 func (a *AWLensInformationNotify) packRequest() string {
 	return "#LPC" + a.Enabled.toWire()
 }
-func (a *AWLensInformationNotify) responseSignature() (awHint, string) {
-	return awNty, "lPC\x02"
+func (a *AWLensInformationNotify) responseSignature() string {
+	return "lPC\x02"
 }
 func (a *AWLensInformationNotify) unpackResponse(cmd string) {
 	a.Enabled = toToggle(cmd[3:4])
@@ -876,8 +876,8 @@ func init() { registerResponse(func() AWResponse { return &AWSoftwareVersion{} }
 func (a *AWSoftwareVersion) Ok() bool {
 	return true
 }
-func (a *AWSoftwareVersion) responseSignature() (awHint, string) {
-	return awNty | awPtz, "qSV\x02V\x02\x02.\x02\x02\x00\x02\x02\x02"
+func (a *AWSoftwareVersion) responseSignature() string {
+	return "qSV\x02V\x02\x02.\x02\x02\x00\x02\x02\x02"
 }
 func (a *AWSoftwareVersion) unpackResponse(cmd string) {
 	_ = cmd[13]
@@ -908,12 +908,40 @@ func (a *AWSoftwareVersionQuery) Response() AWResponse {
 		Component: a.Component,
 	}
 }
-func (a *AWSoftwareVersionQuery) requestSignature() (awHint, string) {
-	return awPtz, "#QSV\x02"
+func (a *AWSoftwareVersionQuery) requestSignature() string {
+	return "#QSV\x02"
 }
 func (a *AWSoftwareVersionQuery) unpackRequest(cmd string) {
 	a.Component = dec2int(cmd[4:5])
 }
 func (a *AWSoftwareVersionQuery) packRequest() string {
 	return "#QSV" + int2dec(a.Component, 1)
+}
+
+type AWTitle struct {
+	Title string
+}
+
+func init() {
+	empty := "                    "
+	for i := range len(empty) {
+		registerResponse(func() AWResponse {
+			return &AWTitle{
+				Title: empty[0:i],
+			}
+		})
+	}
+}
+
+func (a *AWTitle) Ok() bool {
+	return true
+}
+func (a *AWTitle) responseSignature() string {
+	return "TITLE:\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"[0:min(len(a.Title)+6, 26)]
+}
+func (a *AWTitle) unpackResponse(cmd string) {
+	a.Title = cmd[6:]
+}
+func (a *AWTitle) packResponse() string {
+	return "TITLE:" + a.Title[0:min(20, len(a.Title))]
 }

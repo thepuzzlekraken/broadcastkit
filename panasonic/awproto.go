@@ -1,6 +1,7 @@
 package panasonic
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -12,19 +13,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-)
-
-// awHint is a bitmask marking where this command is expected to appear.
-//
-// Because the Panasonic commands textual representation is not unique, this
-// is used to determine look-up tables and endpoints.
-type awHint int
-
-const (
-	awPtz       awHint = 1 << iota // expected over aw_ptz interface
-	awCam                          // expected over aw_cam interface
-	awNty                          // expected over notifications interface
-	awHintCount awHint = 3
 )
 
 const networkTimeout = 3 * time.Second
@@ -40,12 +28,12 @@ type AWResponse interface {
 	// The return value follows the Panasonic behavior, which is rarely useful
 	// beyond the basic check for command acceptance.
 	Ok() bool
-	// responseSignature returns hint and pattern of Panasonic string literals.
+	// responseSignature returns the pattern of Panasonic string literals.
 	//
 	// Pattern is in a custom format of this package. The match() function
 	// should be used to test the pattern on any string literals before passing
 	// them to unpackResponse().
-	responseSignature() (awHint, string)
+	responseSignature() string
 	// unpackResponse parses response values from Panasonic string literal.
 	//
 	// It is the responsibility of the caller to ensure pattern match before
@@ -76,10 +64,10 @@ type AWRequest interface {
 	//
 	// The actual response returned by a device may be of a different type.
 	Response() AWResponse
-	// requestSignature returns the hint and pattern of Panasonic string.
+	// requestSignature returns the pattern of Panasonic string.
 	//
 	// Limitations are the same as AWResponse.responseSignature()
-	requestSignature() (awHint, string)
+	requestSignature() string
 	// unpackRequest parses request values from Panasonic string.
 	//
 	// The passed string must match the requestSignature() pattern. Limitations
@@ -98,15 +86,14 @@ type AWRequest interface {
 // possible to understand the meaning of such replies. They are intended for
 // proxying only.
 type AWUnknownResponse struct {
-	hint awHint
 	text string
 }
 
 func (a *AWUnknownResponse) Ok() bool {
 	return false
 }
-func (a *AWUnknownResponse) responseSignature() (awHint, string) {
-	return a.hint, a.text
+func (a *AWUnknownResponse) responseSignature() string {
+	return a.text
 }
 func (a *AWUnknownResponse) unpackResponse(_ string) {}
 func (a *AWUnknownResponse) packResponse() string {
@@ -119,7 +106,6 @@ func (a *AWUnknownResponse) packResponse() string {
 // understand the meaning of such requests. Their intended use is proxying or to
 // be replied with AWErrUnsupported.
 type AWUnknownRequest struct {
-	hint awHint
 	text string
 }
 
@@ -131,8 +117,8 @@ func (a *AWUnknownRequest) Response() AWResponse {
 	// struct to avoid applications unknowingly casting them to the other type.
 	return &AWUnknownResponse{}
 }
-func (a *AWUnknownRequest) requestSignature() (awHint, string) {
-	return a.hint, a.text
+func (a *AWUnknownRequest) requestSignature() string {
+	return a.text
 }
 func (a *AWUnknownRequest) unpackRequest(_ string) {}
 func (a *AWUnknownRequest) packRequest() string {
@@ -152,114 +138,65 @@ type awResponseFactory struct {
 }
 
 // awRequestTable is the factory lookup table for AWRequests
-var awRequestTable = [awHintCount][]awRequestFactory{}
+var awRequestTable = []awRequestFactory{}
 
 // awResponseTable is the factory lookup table for AWResponses
-var awResponseTable = [awHintCount][]awResponseFactory{}
+var awResponseTable = []awResponseFactory{}
 
 // registerRequest registers a new request type with the factory table
 func registerRequest(new func() AWRequest) {
 	// TODO(zsh): These functions may be optimized away by code-generation instead.
 	n := new()
-	f, p := n.requestSignature()
-	for i := range awHintCount {
-		m := 1 << i
-		if int(f)&m != 0 {
-			awRequestTable[i] = append(awRequestTable[i], awRequestFactory{p, new})
-		}
-	}
+	p := n.requestSignature()
+	awRequestTable = append(awRequestTable, awRequestFactory{p, new})
 }
 
 // registerResponse registers a new response type with the factory table
 func registerResponse(new func() AWResponse) {
 	// TODO(zsh): These functions may be optimized away by code-generation instead.
 	n := new()
-	f, p := n.responseSignature()
-	for i := range awHintCount {
-		m := 1 << i
-		if int(f)&m != 0 {
-			awResponseTable[i] = append(awResponseTable[i], awResponseFactory{p, new})
-		}
-	}
+	p := n.responseSignature()
+	awResponseTable = append(awResponseTable, awResponseFactory{p, new})
 }
 
 // newRequest creates a new request via the factory
-func newRequest(hint awHint, cmd string) AWRequest {
+func newRequest(cmd string) AWRequest {
 	// This function is within a latency-critical path of incoming requests.
 	// Following is a tight-loop with everything inlined, but this may need
 	// optimization if latency becomes an issue.
-	for i := range awHintCount {
-		m := 1 << i
-		if int(hint)&m == 0 {
-			continue
-		}
-		for _, e := range awRequestTable[i] {
-			if match(e.sig, cmd) {
-				req := e.new()
-				req.unpackRequest(cmd)
-				return req
-			}
+	for _, e := range awRequestTable {
+		if match(e.sig, cmd) {
+			req := e.new()
+			req.unpackRequest(cmd)
+			return req
 		}
 	}
 	return &AWUnknownRequest{
-		hint: hint,
 		text: cmd,
 	}
 }
 
 // newResponse creates a new response via the factory
-func newResponse(hint awHint, cmd string) AWResponse {
+func newResponse(cmd string) AWResponse {
 	// This function is less critical than newRequest(), because the object
 	// returned by AWRequest.Response() is used in happy-path response creation.
-	for i := range awHintCount {
-		m := 1 << i
-		if int(hint)&m == 0 {
-			continue
-		}
-		debug := awResponseTable
-		_ = debug
-		for _, e := range awResponseTable[i] {
-			if match(e.sig, cmd) {
-				res := e.new()
-				res.unpackResponse(cmd)
-				return res
-			}
+	for _, e := range awResponseTable {
+		if match(e.sig, cmd) {
+			res := e.new()
+			res.unpackResponse(cmd)
+			return res
 		}
 	}
 	return &AWUnknownResponse{
-		hint: hint,
 		text: cmd,
 	}
 }
 
-// NewAWError creates an AWError as a Panasonic device would.
-// This is intended for simulating errors as a proxy or virtual device.
-func NewAWError(n AWErrNo, c AWRequest) *AWError {
-	f, _ := c.requestSignature()
-	t := c.packRequest()
-	return &AWError{
-		cap:  (f & awPtz) == 0,
-		No:   n,
-		Flag: t[:min(len(t), 3)],
-	}
-}
-
-// NetworkError is an error condition outside of the Panasonic protocol
-type NetworkError struct {
-	parent error
-}
-
-func (e *NetworkError) Error() string {
-	return fmt.Sprintf("panasonic network failure: %s", e.parent.Error())
-}
-func (e *NetworkError) Unwrap() error {
-	return e.parent
-}
-
 // CameraRemote represent a remote camera to be controlled via the AW protocol
 type CameraRemote struct {
-	// Addr is the IP address of the camera
-	Addr netip.Addr
+	// Remote is the IP address and port of the remote camera
+	// If the port is 0, the default port 80 is used.
+	Remote netip.AddrPort
 	// Http is the HTTP client to use for requests
 	//
 	// Some variables are adjusted for Panasonic protocol unless explicitly set
@@ -290,11 +227,17 @@ func (c *CameraRemote) httpGet(path string, query string) (*http.Response, error
 	// 	 GET /cgi-bin/aw_ptz?cmd=#R00&res=1 HTTP/1.0
 	//   Host:198.051.100.008
 	// We use a proper HTTP client instead.
+	var host string
+	if c.Remote.Port() == 0 {
+		host = c.Remote.Addr().String()
+	} else {
+		host = c.Remote.String()
+	}
 	return c.Http.Do(&http.Request{
 		Method: "GET",
 		URL: &url.URL{
 			Scheme:   "http",
-			Host:     c.Addr.String(),
+			Host:     host,
 			Path:     path,
 			RawQuery: query,
 		},
@@ -303,21 +246,21 @@ func (c *CameraRemote) httpGet(path string, query string) (*http.Response, error
 		ProtoMinor: 1,
 		Header:     make(http.Header),
 		Body:       nil,
-		Host:       c.Addr.String(),
+		Host:       host,
 	})
 }
 
 // strCommand sends a command string to the camera over the http transport
-func (c *CameraRemote) strCommand(hint awHint, cmd string) (string, error) {
+func (c *CameraRemote) strCommand(cmd string) (string, error) {
 	var path string
 
-	if hint&awPtz != 0 {
+	// "guess" the endpoint based on the first character of the command
+	if cmd[0] == '#' {
 		path = "/cgi-bin/aw_ptz"
-	} else if hint&awCam != 0 {
-		path = "/cgi-bin/aw_cam"
 	} else {
-		return "", fmt.Errorf("unsupported command on AW interface: %v", cmd)
+		path = "/cgi-bin/aw_cam"
 	}
+
 	// Panasonic panels do NOT urlencode the command even though it contains #
 	// Since the specification permits encoding, we do it for http compliance.
 	res, err := c.httpGet(path, "cmd="+url.QueryEscape(cmd)+"&res=1")
@@ -338,24 +281,26 @@ func (c *CameraRemote) strCommand(hint awHint, cmd string) (string, error) {
 	return string(trim(b)), nil
 }
 
+// Command sends the passed AWRequest to the camera
+//
+// AW protocol error responses will be returned as both AWResponse and error
+// Check for AWResponse == nil when proxying but error != nil when processing.
 func (c *CameraRemote) Command(req AWRequest) (AWResponse, error) {
-	hint, _ := req.requestSignature()
 	cmd := req.packRequest()
 
-	ret, err := c.strCommand(hint, cmd)
+	ret, err := c.strCommand(cmd)
 	if err != nil {
 		return nil, &NetworkError{err}
 	}
 
 	res := req.Response()
-	_, sig := res.responseSignature()
+	sig := res.responseSignature()
 	if match(sig, ret) {
 		res.unpackResponse(ret)
 		return res, nil
 	}
 
-	res = newResponse(hint, ret)
-
+	res = newResponse(ret)
 	if err, ok := res.(error); ok {
 		return res, err
 	}
@@ -363,6 +308,10 @@ func (c *CameraRemote) Command(req AWRequest) (AWResponse, error) {
 	return res, nil
 }
 
+// NotificationListener returns a listener for the AW notification protocol
+//
+// The returned listener already has an open a TCP listening port and ready
+// to accept notifications.
 func (c *CameraRemote) NotificationListener() (*CameraNotifyListener, error) {
 	listener, err := net.ListenTCP("tcp4", &net.TCPAddr{})
 	if err != nil {
@@ -464,18 +413,22 @@ func notifyPack(response string, session *NotifySession, date time.Time) []byte 
 	return b
 }
 
+// CameraNotifyListener is the listener object for the AW notification protocol
+// Use the CameraRemote.NotificationListener() method to obtain a new instance.
 type CameraNotifyListener struct {
 	once sync.Once
 	lis  *net.TCPListener
 	cam  *CameraRemote
 }
 
+// Start requests the camera to start sending notifications
 func (l *CameraNotifyListener) Start() error {
 	err := l.start()
-	l.once.Do(func() {})
+	l.once.Do(func() {}) // mark start as done
 	return err
 }
 
+// start is the actual implementation of the Start() method
 func (l *CameraNotifyListener) start() error {
 	port := netip.MustParseAddrPort(l.lis.Addr().String()).Port()
 	res, err := l.cam.httpGet("/cgi-bin/event", "connect=start&my_port="+strconv.Itoa(int(port))+"&uid=0")
@@ -488,6 +441,7 @@ func (l *CameraNotifyListener) start() error {
 	return nil
 }
 
+// Stop requests the camera to stop sending notifications
 func (l *CameraNotifyListener) Stop() error {
 	port := netip.MustParseAddrPort(l.lis.Addr().String()).Port()
 	res, err := l.cam.httpGet("/cgi-bin/event", "connect=start&my_port="+strconv.Itoa(int(port))+"&uid=0")
@@ -500,12 +454,14 @@ func (l *CameraNotifyListener) Stop() error {
 	return nil
 }
 
+// Addr returns the local address where this listener awaits notifications
 func (l *CameraNotifyListener) Addr() netip.AddrPort {
 	return netip.MustParseAddrPort(l.lis.Addr().String())
 }
 
+// acceptTCP accepts tcp connections from the camera only
 func (l *CameraNotifyListener) acceptTCP() (*net.TCPConn, error) {
-	camaddr := l.cam.Addr
+	camaddr := l.cam.Remote.Addr()
 	for {
 		conn, err := l.lis.AcceptTCP()
 		if err != nil {
@@ -521,6 +477,12 @@ func (l *CameraNotifyListener) acceptTCP() (*net.TCPConn, error) {
 	}
 }
 
+// Accept blocks until the next notification is received and returns it.
+//
+// If Start() has not been called, this function will call it automatically
+// once. This does not include handling network issues or reconnections. It is
+// the responsibility of the caller to re-call Start() if expected notifications
+// are not received.
 func (l *CameraNotifyListener) Accept() (AWResponse, error) {
 	l.once.Do(func() { l.start() })
 
@@ -542,14 +504,19 @@ func (l *CameraNotifyListener) Accept() (AWResponse, error) {
 		return nil, &NetworkError{err}
 	}
 
-	return newResponse(awNty, cmd), nil
+	return newResponse(cmd), nil
 }
 
+// Close closes the listener.
+//
+// Any currently blocked Accept() calls will be unblocked and return an error.
+// Stop() will be called automatically before closing.
 func (l *CameraNotifyListener) Close() error {
 	_ = l.Stop()
 	return l.lis.Close()
 }
 
+// sendTCP dumps the data into a new TCP connection, than slams it closed.
 func sendTCP(b []byte, dst netip.AddrPort) error {
 	conn, err := net.DialTimeout("tcp4", dst.String(), networkTimeout)
 	if err != nil {
@@ -745,6 +712,60 @@ func (c *HttpHandler) setup() {
 	c.mux.HandleFunc("/cgi-bin/aw_cam", c.serveCam)
 	c.mux.HandleFunc("/cgi-bin/event", c.serveEvent)
 	c.mux.HandleFunc("/cgi-bin/man_session", c.serveManSession)
+	c.mux.HandleFunc("/live/camdata.html", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Content-Type", "text/html")
+		data := []byte(`p1
+OID:AW-UE70
+CGI_TIME:0
+OSA:87:0x05
+TITLE:AW-UE70
+OSD:B9:0x05
+OGU:0x80
+OTD:0x1E
+OAW:9
+OSH:0x0
+ODT:1
+OSF:0
+OBR:0
+sWZ1
+OSE:71:0
+iNS0
+OUS:0
+d11
+d31
+s1
+OSA:30:89
+d60
+d40
+OSD:4F:E7
+OER:0
+rt1
+axz555
+rER00
+axfAF6
+pE000000000035
+pE01003E0FFC00
+pE020000038000
+uPVS999
+lC10
+lC20
+lC30
+lC40
+ORG:0x1D
+OBG:0x1E
+OSD:B1:0x024
+pST2
+pRF0
+OIS:0
+OSE:70:0
+OSD:B3:1
+ODE:0
+`)
+		for _, l := range bytes.Split(data, []byte("\n")) {
+			w.Write(l)
+			w.Write([]byte("\r\n"))
+		}
+	})
 }
 
 func (c *HttpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -772,14 +793,14 @@ func (c *HttpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *HttpHandler) servePtz(w http.ResponseWriter, r *http.Request) {
-	c.wrapAW(awPtz, w, r)
+	c.wrapAW(true, w, r)
 }
 
 func (c *HttpHandler) serveCam(w http.ResponseWriter, r *http.Request) {
-	c.wrapAW(awCam, w, r)
+	c.wrapAW(false, w, r)
 }
 
-func (c *HttpHandler) wrapAW(hint awHint, w http.ResponseWriter, r *http.Request) {
+func (c *HttpHandler) wrapAW(hash bool, w http.ResponseWriter, r *http.Request) {
 	// Generate a "Bad Request" for missing parameters
 	qry := r.URL.Query()
 	if qry.Get("res") != "1" {
@@ -787,11 +808,16 @@ func (c *HttpHandler) wrapAW(hint awHint, w http.ResponseWriter, r *http.Request
 		return
 	}
 	strcmd := qry.Get("cmd")
-	if strcmd == "" {
+	if len(strcmd) < 1 {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
-	awcmd := newRequest(hint, strcmd)
+	// Generate a "Bad Request" for confused endpoints
+	if (strcmd[0] == '#') != hash {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+	awcmd := newRequest(strcmd)
 	awres := c.AWHandler.ServeAW(awcmd)
 	w.Header().Set("Content-Type", "text/plain")
 	w.Write([]byte(awres.packResponse()))
@@ -812,8 +838,9 @@ func (c *HttpHandler) serveEvent(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
-	// There's also a uid parameter, which seem to be ignored by cameras.
-	// Documentation states to set it to 0. AW-RP50 sets it to 50. We ignore it.
+	// There's also a uid parameter:
+	// Documentation states uid=0 constant. AW-RP50 sets it UID=50 constant.
+	// AW-UE70 camera seems to ignore it. We also ignore it.
 
 	ip := netip.MustParseAddrPort(r.RemoteAddr).Addr()
 	client := netip.AddrPortFrom(ip, uint16(portNo))
