@@ -38,9 +38,9 @@ func (e *AWError) Ok() bool {
 	return false
 }
 func (e *AWError) responseSignature() string {
-	sig := "\x03R\x01:\x00\x00\x00"
+	sig := "\x03R\x01:\xF7"
 	// return the correct-length pattern depending on flag length
-	return sig[0:min(4+len(e.Flag), 7)]
+	return sig[0:min(4+len(e.Flag), 5)]
 }
 func (e *AWError) unpackResponse(s string) {
 	e.cap = s[0] == 'E'
@@ -54,12 +54,9 @@ func (e *AWError) packResponse() string {
 	return "eR" + int2dec(int(e.No), 1) + ":" + e.Flag
 }
 func init() {
-	// AW commands are fixed length, except for errors.	Pattern matching is
-	// fixed-length, so we register a separate error for each possible length.
+	// The \xF7 matches any character of any length, but error may have nothing
 	registerResponse(func() AWResponse { return &AWError{Flag: ""} })
 	registerResponse(func() AWResponse { return &AWError{Flag: " "} })
-	registerResponse(func() AWResponse { return &AWError{Flag: "  "} })
-	registerResponse(func() AWResponse { return &AWError{Flag: "   "} })
 }
 
 // NewAWError creates an AWError as a Panasonic device would.
@@ -73,14 +70,14 @@ func NewAWError(n AWErrNo, c AWRequest) *AWError {
 	}
 }
 
-// NetworkError is an error condition outside of the Panasonic protocol
-type NetworkError struct {
+// SystemError is an error condition outside of the Panasonic protocol
+type SystemError struct {
 	parent error
 }
 
-func (e *NetworkError) Error() string {
+func (e *SystemError) Error() string {
 	return fmt.Sprintf("panasonic network failure: %s", e.parent.Error())
 }
-func (e *NetworkError) Unwrap() error {
+func (e *SystemError) Unwrap() error {
 	return e.parent
 }

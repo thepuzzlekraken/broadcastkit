@@ -135,6 +135,8 @@ func Test_match(t *testing.T) {
 		{"All wildcards", "\x00\x01\x02\x01", "aB2D", true},
 		{"Complex pattern", "a\x00C\x01\x02F", "aXCD3F", true},
 		{"Complex pattern mismatch", "a\x00C\x01\x02f", "aBCD3g", false},
+		{"Magic stop char match", "A\x00C\x01E\x7F", "ABCDEFGHIJKL", true},
+		{"Magic stop char mismatch", "A\x00C\x01E\x7F", "ABCDeFGHIJKL", false},
 	}
 
 	for _, tt := range tests {

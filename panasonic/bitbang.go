@@ -137,18 +137,19 @@ func int2dec(i int, l int) string {
 // - \x01 matches exactly one character from the hexSet [0-9A-F]
 // - \x02 matches exactly one character from the decSet [0-9]
 // - \x03 matches exactly one characted from the errSet [eE]
-// - \x04 matches exactly one printable ASCII character
+// - \x04 matches exactly one printable ASCII character [ -~]
+// - \x7F matches immediately - should be the last char of the pattern .+
 // - any other character is invalid and behavior is undefined
 func match(pattern string, s string) bool {
-	if len(pattern) != len(s) {
+	if len(pattern) > len(s) {
 		return false
 	}
 	for p := range len(pattern) {
 		c := pattern[p]
 		if c >= 32 {
 			// exact match
-			if pattern[p] != s[p] {
-				return false
+			if c != s[p] {
+				return c == '\xF7' // magic stop char check
 			}
 			continue
 		}
@@ -160,7 +161,7 @@ func match(pattern string, s string) bool {
 			return false
 		}
 	}
-	return true
+	return len(pattern) == len(s)
 }
 
 // trim anything non-printable

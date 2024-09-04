@@ -1,7 +1,7 @@
 package panasonic
 
 import (
-	"bytes"
+	"bufio"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -283,14 +283,14 @@ func (c *CameraRemote) strCommand(cmd string) (string, error) {
 
 // Command sends the passed AWRequest to the camera
 //
-// AW protocol error responses will be returned as both AWResponse and error
-// Check for AWResponse == nil when proxying but error != nil when processing.
+// AW protocol error responses are not considered errors. Check AWResponse.Ok()
+// to know if the Request was accepted.
 func (c *CameraRemote) Command(req AWRequest) (AWResponse, error) {
 	cmd := req.packRequest()
 
 	ret, err := c.strCommand(cmd)
 	if err != nil {
-		return nil, &NetworkError{err}
+		return nil, &SystemError{err}
 	}
 
 	res := req.Response()
@@ -300,11 +300,26 @@ func (c *CameraRemote) Command(req AWRequest) (AWResponse, error) {
 		return res, nil
 	}
 
-	res = newResponse(ret)
-	if err, ok := res.(error); ok {
-		return res, err
-	}
+	return newResponse(ret), nil
+}
 
+func (c *CameraRemote) BatchInformation() ([]AWResponse, error) {
+	data, err := c.httpGet("/live/camdata.html", "")
+	if err != nil {
+		return nil, &SystemError{err}
+	}
+	defer data.Body.Close()
+	if data.StatusCode != http.StatusOK {
+		return nil, &SystemError{fmt.Errorf("http status code: %d (expected %d)", data.StatusCode, http.StatusOK)}
+	}
+	scan := bufio.NewScanner(data.Body)
+	res := make([]AWResponse, 0)
+	for scan.Scan() {
+		res = append(res, newResponse(scan.Text()))
+	}
+	if err := scan.Err(); err != nil {
+		return nil, &SystemError{err}
+	}
 	return res, nil
 }
 
@@ -315,7 +330,7 @@ func (c *CameraRemote) Command(req AWRequest) (AWResponse, error) {
 func (c *CameraRemote) NotificationListener() (*CameraNotifyListener, error) {
 	listener, err := net.ListenTCP("tcp4", &net.TCPAddr{})
 	if err != nil {
-		return nil, &NetworkError{err}
+		return nil, &SystemError{err}
 	}
 	return &CameraNotifyListener{
 		lis: listener,
@@ -433,10 +448,11 @@ func (l *CameraNotifyListener) start() error {
 	port := netip.MustParseAddrPort(l.lis.Addr().String()).Port()
 	res, err := l.cam.httpGet("/cgi-bin/event", "connect=start&my_port="+strconv.Itoa(int(port))+"&uid=0")
 	if err != nil {
-		return &NetworkError{err}
+		return &SystemError{err}
 	}
+	defer res.Body.Close()
 	if res.StatusCode != http.StatusNoContent {
-		return &NetworkError{fmt.Errorf("http status code: %d (expected %d)", res.StatusCode, http.StatusNoContent)}
+		return &SystemError{fmt.Errorf("http status code: %d (expected %d)", res.StatusCode, http.StatusNoContent)}
 	}
 	return nil
 }
@@ -446,10 +462,11 @@ func (l *CameraNotifyListener) Stop() error {
 	port := netip.MustParseAddrPort(l.lis.Addr().String()).Port()
 	res, err := l.cam.httpGet("/cgi-bin/event", "connect=start&my_port="+strconv.Itoa(int(port))+"&uid=0")
 	if err != nil {
-		return &NetworkError{err}
+		return &SystemError{err}
 	}
+	defer res.Body.Close()
 	if res.StatusCode != http.StatusNoContent {
-		return &NetworkError{fmt.Errorf("http status code: %d (expected %d)", res.StatusCode, http.StatusNoContent)}
+		return &SystemError{fmt.Errorf("http status code: %d (expected %d)", res.StatusCode, http.StatusNoContent)}
 	}
 	return nil
 }
@@ -488,7 +505,7 @@ func (l *CameraNotifyListener) Accept() (AWResponse, error) {
 
 	conn, err := l.acceptTCP()
 	if err != nil {
-		return nil, &NetworkError{err}
+		return nil, &SystemError{err}
 	}
 
 	conn.SetDeadline(time.Now().Add(networkTimeout))
@@ -496,12 +513,12 @@ func (l *CameraNotifyListener) Accept() (AWResponse, error) {
 	conn.Close()
 
 	if err != nil {
-		return nil, &NetworkError{err}
+		return nil, &SystemError{err}
 	}
 
 	cmd, err := notifyUnpack(b)
 	if err != nil {
-		return nil, &NetworkError{err}
+		return nil, &SystemError{err}
 	}
 
 	return newResponse(cmd), nil
@@ -629,7 +646,7 @@ func (s *NotifySession) Send(res AWResponse) error {
 		// Sleeping just 100ms is the backoff strategy of Panasonic hardware.
 		time.Sleep(100 * time.Millisecond)
 	}
-	return &NetworkError{err}
+	return &SystemError{err}
 }
 
 // NotifyList is a thread-safe locked list of NotifySessions
@@ -689,13 +706,8 @@ func (l *NotifyList) Len() int {
 }
 
 type Handler interface {
-	ServeAW(AWRequest) AWResponse
-}
-
-type HandlerFunc func(AWRequest) AWResponse
-
-func (f HandlerFunc) ServeAW(r AWRequest) AWResponse {
-	return f(r)
+	ServeRequest(AWRequest) AWResponse
+	ServeBatch() []AWResponse
 }
 
 // HttpHandler is an http.Handler that implements an endpoint for AW protocol.
@@ -712,60 +724,7 @@ func (c *HttpHandler) setup() {
 	c.mux.HandleFunc("/cgi-bin/aw_cam", c.serveCam)
 	c.mux.HandleFunc("/cgi-bin/event", c.serveEvent)
 	c.mux.HandleFunc("/cgi-bin/man_session", c.serveManSession)
-	c.mux.HandleFunc("/live/camdata.html", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Content-Type", "text/html")
-		data := []byte(`p1
-OID:AW-UE70
-CGI_TIME:0
-OSA:87:0x05
-TITLE:AW-UE70
-OSD:B9:0x05
-OGU:0x80
-OTD:0x1E
-OAW:9
-OSH:0x0
-ODT:1
-OSF:0
-OBR:0
-sWZ1
-OSE:71:0
-iNS0
-OUS:0
-d11
-d31
-s1
-OSA:30:89
-d60
-d40
-OSD:4F:E7
-OER:0
-rt1
-axz555
-rER00
-axfAF6
-pE000000000035
-pE01003E0FFC00
-pE020000038000
-uPVS999
-lC10
-lC20
-lC30
-lC40
-ORG:0x1D
-OBG:0x1E
-OSD:B1:0x024
-pST2
-pRF0
-OIS:0
-OSE:70:0
-OSD:B3:1
-ODE:0
-`)
-		for _, l := range bytes.Split(data, []byte("\n")) {
-			w.Write(l)
-			w.Write([]byte("\r\n"))
-		}
-	})
+	c.mux.HandleFunc("/live/camdata.html", c.serveCamData)
 }
 
 func (c *HttpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -818,7 +777,7 @@ func (c *HttpHandler) wrapAW(hash bool, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	awcmd := newRequest(strcmd)
-	awres := c.AWHandler.ServeAW(awcmd)
+	awres := c.AWHandler.ServeRequest(awcmd)
 	w.Header().Set("Content-Type", "text/plain")
 	w.Write([]byte(awres.packResponse()))
 }
@@ -869,4 +828,14 @@ func (c *HttpHandler) serveManSession(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 	w.Write([]byte("Event session:"))
 	w.Write([]byte(strconv.Itoa(c.Sessions.Len())))
+}
+
+func (c *HttpHandler) serveCamData(w http.ResponseWriter, r *http.Request) {
+	b := c.AWHandler.ServeBatch()
+	w.Header().Add("Content-Type", "text/html")
+	w.WriteHeader(http.StatusOK)
+	for _, r := range b {
+		w.Write([]byte(r.packResponse()))
+		w.Write([]byte("\r\n"))
+	}
 }

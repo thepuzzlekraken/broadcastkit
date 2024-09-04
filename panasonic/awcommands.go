@@ -922,26 +922,17 @@ type AWTitle struct {
 	Title string
 }
 
-func init() {
-	empty := "                    "
-	for i := range len(empty) {
-		registerResponse(func() AWResponse {
-			return &AWTitle{
-				Title: empty[0:i],
-			}
-		})
-	}
-}
-
+func init() { registerResponse(func() AWResponse { return &AWTitle{} }) }
+func init() { registerResponse(func() AWResponse { return &AWTitle{Title: " "} }) }
 func (a *AWTitle) Ok() bool {
 	return true
 }
 func (a *AWTitle) responseSignature() string {
-	return "TITLE:\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"[0:min(len(a.Title)+6, 26)]
+	return "TITLE:\xF7"[:min(len(a.Title)+6, 7)]
 }
 func (a *AWTitle) unpackResponse(cmd string) {
 	a.Title = cmd[6:]
 }
 func (a *AWTitle) packResponse() string {
-	return "TITLE:" + a.Title[0:min(20, len(a.Title))]
+	return "TITLE:" + a.Title
 }

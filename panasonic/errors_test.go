@@ -18,22 +18,22 @@ func TestAWErrorResponseSignature(t *testing.T) {
 		{
 			name:    "Short flag",
 			flag:    " ",
-			wantSig: "\x03R\x01:\x00",
+			wantSig: "\x03R\x01:\xF7",
 		},
 		{
 			name:    "Medium flag",
 			flag:    "AB",
-			wantSig: "\x03R\x01:\x00\x00",
+			wantSig: "\x03R\x01:\xF7",
 		},
 		{
 			name:    "Max length flag",
 			flag:    "   ",
-			wantSig: "\x03R\x01:\x00\x00\x00",
+			wantSig: "\x03R\x01:\xF7",
 		},
 		{
 			name:    "Oversized flag",
 			flag:    "TOOLONG",
-			wantSig: "\x03R\x01:\x00\x00\x00",
+			wantSig: "\x03R\x01:\xF7",
 		},
 	}
 
