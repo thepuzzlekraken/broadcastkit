@@ -253,8 +253,8 @@ func (e *NetworkError) Unwrap() error {
 	return e.parent
 }
 
-// Camera represent a remote camera to be controlled via the AW protocol
-type Camera struct {
+// CameraRemote represent a remote camera to be controlled via the AW protocol
+type CameraRemote struct {
 	// Addr is the IP address of the camera
 	Addr netip.Addr
 	// Http is the HTTP client to use for requests
@@ -268,7 +268,7 @@ type Camera struct {
 }
 
 // httpInit sets good defaults of the Http client for the quirks in AW protocol
-func (c *Camera) httpInit() {
+func (c *CameraRemote) httpInit() {
 	if c.Http.CheckRedirect == nil {
 		c.Http.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
@@ -280,7 +280,7 @@ func (c *Camera) httpInit() {
 }
 
 // httpGet does an http.Get to the camera with the quirks of the AW protocol
-func (c *Camera) httpGet(path string, query string) (*http.Response, error) {
+func (c *CameraRemote) httpGet(path string, query string) (*http.Response, error) {
 	c.httpOnce.Do(c.httpInit)
 	return c.Http.Do(&http.Request{
 		Method: "GET",
@@ -302,7 +302,7 @@ func (c *Camera) httpGet(path string, query string) (*http.Response, error) {
 }
 
 // strCommand sends a command string to the camera over the http transport
-func (c *Camera) strCommand(hint awHint, cmd string) (string, error) {
+func (c *CameraRemote) strCommand(hint awHint, cmd string) (string, error) {
 	var path string
 
 	if hint&awPtz != 0 {
@@ -331,7 +331,7 @@ func (c *Camera) strCommand(hint awHint, cmd string) (string, error) {
 	return string(trim(b)), nil
 }
 
-func (c *Camera) Command(req AWRequest) (AWResponse, error) {
+func (c *CameraRemote) Command(req AWRequest) (AWResponse, error) {
 	hint, _ := req.requestSignature()
 	cmd := req.packRequest()
 
@@ -356,7 +356,7 @@ func (c *Camera) Command(req AWRequest) (AWResponse, error) {
 	return res, nil
 }
 
-func (c *Camera) UpdateListener() (*CameraUpdateListener, error) {
+func (c *CameraRemote) UpdateListener() (*CameraUpdateListener, error) {
 	listener, err := net.ListenTCP("tcp4", &net.TCPAddr{})
 	if err != nil {
 		return nil, &NetworkError{err}
@@ -451,7 +451,7 @@ func notifyPack(response string, counter uint16, camIP netip.Addr, camMAC net.Ha
 type CameraUpdateListener struct {
 	once sync.Once
 	lis  *net.TCPListener
-	cam  *Camera
+	cam  *CameraRemote
 }
 
 func (u *CameraUpdateListener) Start() error {
@@ -526,4 +526,91 @@ func (u *CameraUpdateListener) Accept() (AWResponse, error) {
 func (u *CameraUpdateListener) Close() error {
 	_ = u.Stop()
 	return u.lis.Close()
+}
+
+type Handler interface {
+	ServeAW(AWRequest) AWResponse
+}
+
+type HandlerFunc func(AWRequest) AWResponse
+
+func (f HandlerFunc) ServeAW(r AWRequest) AWResponse {
+	return f(r)
+}
+
+type HttpHandler struct {
+	once      sync.Once
+	mux       http.ServeMux
+	AWHandler Handler
+}
+
+func (c *HttpHandler) setup() {
+	c.mux = http.ServeMux{}
+	c.mux.HandleFunc("/cgi-bin/aw_ptz", c.servePtz)
+	c.mux.HandleFunc("/cgi-bin/aw_cam", c.serveCam)
+	c.mux.HandleFunc("/cgi-bin/man_session", func(w http.ResponseWriter, r *http.Request) {
+		// Quick workaround to make AW-RP50 think it is connected to us.
+		w.Write([]byte("Event session:1"))
+	})
+}
+
+func (c *HttpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	c.once.Do(c.setup)
+	c.mux.ServeHTTP(w, r)
+}
+
+func (c *HttpHandler) servePtz(w http.ResponseWriter, r *http.Request) {
+	c.serveAW(awPtz, w, r)
+}
+
+func (c *HttpHandler) serveCam(w http.ResponseWriter, r *http.Request) {
+	c.serveAW(awCam, w, r)
+}
+
+func (c *HttpHandler) serveAW(hint awHint, w http.ResponseWriter, r *http.Request) {
+	// There's no documentation about the error conditions that happen when
+	// the AW Protocol is violated. We mostly follow the spec instead, returning
+	// 400 Bad Request for anything wildly wrong with the request and 500 for
+	// anything wildly wrong inside the application.
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("panic: %v\n", r)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+	}()
+	if r.Method != http.MethodGet {
+		// This is not what happens for real hardware, but we don't handle the
+		// undocumented xml interface that appears to be behind POST/PUT
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	// Generate a "Bad Request" for missing parameters
+	qry := r.URL.Query()
+	if r := qry.Get("res"); r != "1" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+	strcmd := qry.Get("cmd")
+	if strcmd == "" {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+	awcmd := newRequest(hint, strcmd)
+	awres := c.AWHandler.ServeAW(awcmd)
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write([]byte(awres.packResponse()))
+}
+
+type notifyWatcher struct {
+	sequence uint16
+	sIP      netip.Addr
+	sMAC     net.HardwareAddr
+}
+
+// CameraEndpoint represent an incoming endpoint for AW commands
+type CameraEndpoint struct {
+	AWHandler   Handler
+	HttpHandler http.Handler
+	watchers    map[netip.AddrPort]notifyWatcher
 }
