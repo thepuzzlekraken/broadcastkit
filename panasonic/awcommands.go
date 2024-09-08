@@ -2164,6 +2164,450 @@ func (a *AWSoftwareVersionQuery) packRequest() string {
 	return "#QSV" + int2dec(a.Component, 1)
 }
 
+// AWAutoFocusAlternate enables or disables the camera autofocus mode
+//
+// This reques is equivalent to the AWAutoFocus but has a different on-wire
+// representation. Most cameras send both commands to improve compatibility.
+type AWAutoFocusAlternate struct {
+	Enabled Toggle
+}
+
+func init() { registerRequest(func() AWRequest { return &AWAutoFocusAlternate{} }) }
+func init() { registerResponse(func() AWResponse { return &AWAutoFocusAlternate{} }) }
+func (a *AWAutoFocusAlternate) Acceptable() bool {
+	return a.Enabled.Acceptable()
+}
+func (a *AWAutoFocusAlternate) Response() AWResponse {
+	return a
+}
+func (a *AWAutoFocusAlternate) Ok() bool {
+	return true
+}
+func (a *AWAutoFocusAlternate) requestSignature() string {
+	return "OAF:\x02"
+}
+func (a *AWAutoFocusAlternate) unpackRequest(cmd string) {
+	a.Enabled = toToggle(cmd[4:5])
+}
+func (a *AWAutoFocusAlternate) packRequest() string {
+	return "OAF:" + a.Enabled.toWire()
+}
+func (a *AWAutoFocusAlternate) responseSignature() string {
+	return a.requestSignature()
+}
+func (a *AWAutoFocusAlternate) unpackResponse(cmd string) {
+	a.unpackRequest(cmd)
+}
+func (a *AWAutoFocusAlternate) packResponse() string {
+	return a.packRequest()
+}
+
+// AWAutoFocusQueryAlternate requests the current AWAutoFocusAlternate.
+type AWAutoFocusQueryAlternate struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWAutoFocusQueryAlternate{} }) }
+func (a *AWAutoFocusQueryAlternate) Acceptable() bool {
+	return true
+}
+func (a *AWAutoFocusQueryAlternate) Response() AWResponse {
+	return &AWAutoFocusAlternate{}
+}
+func (a *AWAutoFocusQueryAlternate) requestSignature() string {
+	return "QAF"
+}
+func (a *AWAutoFocusQueryAlternate) unpackRequest(_ string) {}
+func (a *AWAutoFocusQueryAlternate) packRequest() string {
+	return "OAF"
+}
+
+// AWOneTouchFocus instruct the camrea to autofocus one time only
+type AWOneTouchFocus struct {
+	Parameter int // this parameter is meaningless, but it's there anyway
+}
+
+func init() { registerRequest(func() AWRequest { return &AWOneTouchFocus{} }) }
+func (a *AWOneTouchFocus) Acceptable() bool {
+	return a.Parameter == 0
+}
+func (a *AWOneTouchFocus) Response() AWResponse {
+	return a
+}
+func (a *AWOneTouchFocus) requestSignature() string {
+	return "OSE:69:\x02"
+}
+func (a *AWOneTouchFocus) unpackRequest(cmd string) {
+	// The only valid value of this parameter is 1. Let's offset it so we can
+	// leave it as zero-value and ignore it's existence.
+	a.Parameter = dec2int(cmd[7:8]) - 1
+}
+func (a *AWOneTouchFocus) packRequest() string {
+	return "OSE:69:" + int2dec(a.Parameter+1, 1)
+}
+func (a *AWOneTouchFocus) Ok() bool {
+	return true
+}
+func (a *AWOneTouchFocus) responseSignature() string {
+	return a.requestSignature()
+}
+func (a *AWOneTouchFocus) unpackResponse(cmd string) {
+	a.unpackRequest(cmd)
+}
+func (a *AWOneTouchFocus) packResponse() string {
+	return a.packRequest()
+}
+
+type AWAutoIrisAlternate struct {
+	Enabled Toggle
+}
+
+func init() { registerRequest(func() AWRequest { return &AWAutoIrisAlternate{} }) }
+func init() { registerResponse(func() AWResponse { return &AWAutoIrisAlternate{} }) }
+func (a *AWAutoIrisAlternate) Acceptable() bool {
+	return a.Enabled.Acceptable()
+}
+func (a *AWAutoIrisAlternate) Response() AWResponse {
+	return a
+}
+func (a *AWAutoIrisAlternate) Ok() bool {
+	return true
+}
+func (a *AWAutoIrisAlternate) requestSignature() string {
+	return "ORS:\x02"
+}
+func (a *AWAutoIrisAlternate) unpackRequest(cmd string) {
+	a.Enabled = toToggle(cmd[4:5])
+}
+func (a *AWAutoIrisAlternate) packRequest() string {
+	return "ORS:" + a.Enabled.toWire()
+}
+func (a *AWAutoIrisAlternate) responseSignature() string {
+	return a.requestSignature()
+}
+func (a *AWAutoIrisAlternate) unpackResponse(cmd string) {
+	a.unpackRequest(cmd)
+}
+func (a *AWAutoIrisAlternate) packResponse() string {
+	return a.packRequest()
+}
+
+// AWAutoIrisQueryAlternate requests the current AWAutoIrisAlternate.
+type AWAutoIrisQueryAlternate struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWAutoIrisQueryAlternate{} }) }
+func (a *AWAutoIrisQueryAlternate) Acceptable() bool {
+	return true
+}
+func (a *AWAutoIrisQueryAlternate) Response() AWResponse {
+	return &AWAutoIrisAlternate{}
+}
+func (a *AWAutoIrisQueryAlternate) requestSignature() string {
+	return "QRS"
+}
+func (a *AWAutoIrisQueryAlternate) unpackRequest(_ string) {}
+func (a *AWAutoIrisQueryAlternate) packRequest() string {
+	return "QRS"
+}
+
+// AWIrisAlternate is functionally identical to AWIris and AWIrisTo but uses a
+// different scale and on-wire representation. Minimum acceptable value is 0,
+// maximum is 1023.
+type AWIrisAlternate struct {
+	Iris int
+}
+
+func init() { registerRequest(func() AWRequest { return &AWIrisAlternate{} }) }
+func init() { registerResponse(func() AWResponse { return &AWIrisAlternate{} }) }
+func (a *AWIrisAlternate) Acceptable() bool {
+	return a.Iris >= 0 && a.Iris <= 1023
+}
+func (a *AWIrisAlternate) Response() AWResponse {
+	return a
+}
+func (a *AWIrisAlternate) Ok() bool {
+	return true
+}
+func (a *AWIrisAlternate) requestSignature() string {
+	return "ORV:\x01\x01\x01"
+}
+func (a *AWIrisAlternate) unpackRequest(cmd string) {
+	a.Iris = hex2int(cmd[4:7])
+}
+func (a *AWIrisAlternate) packRequest() string {
+	return "ORV:" + int2hex(a.Iris, 3)
+}
+func (a *AWIrisAlternate) responseSignature() string {
+	return a.requestSignature()
+}
+func (a *AWIrisAlternate) unpackResponse(cmd string) {
+	a.unpackRequest(cmd)
+}
+func (a *AWIrisAlternate) packResponse() string {
+	return a.packRequest()
+}
+
+// AWIrisQueryAlternate requests the current AWIrisAlternate.
+type AWIrisQueryAlternate struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWIrisQueryAlternate{} }) }
+func (a *AWIrisQueryAlternate) Acceptable() bool {
+	return true
+}
+func (a *AWIrisQueryAlternate) Response() AWResponse {
+	return &AWIrisAlternate{}
+}
+func (a *AWIrisQueryAlternate) requestSignature() string {
+	return "QRV"
+}
+func (a *AWIrisQueryAlternate) unpackRequest(_ string) {}
+func (a *AWIrisQueryAlternate) packRequest() string {
+	return "QRV"
+}
+
+// AWIrisAlternate2 is functionally identical to AWIrisQueryAlternate,
+// AWIrisTo and AWIris, but uses yet another scale. Valid values are between
+// 0 and 255
+type AWIrisAlternate2 struct {
+	Iris int
+}
+
+func init() { registerRequest(func() AWRequest { return &AWIrisAlternate2{} }) }
+func init() { registerResponse(func() AWResponse { return &AWIrisAlternate2{} }) }
+func (a *AWIrisAlternate2) Acceptable() bool {
+	return a.Iris >= 0 && a.Iris <= 255
+}
+func (a *AWIrisAlternate2) Response() AWResponse {
+	return a
+}
+func (a *AWIrisAlternate2) Ok() bool {
+	return true
+}
+func (a *AWIrisAlternate2) requestSignature() string {
+	return "OSD:4F:\x01\x01"
+}
+func (a *AWIrisAlternate2) unpackRequest(cmd string) {
+	a.Iris = hex2int(cmd[7:9])
+}
+func (a *AWIrisAlternate2) packRequest() string {
+	return "OSD:4F:" + int2hex(a.Iris, 2)
+}
+func (a *AWIrisAlternate2) responseSignature() string {
+	return a.requestSignature()
+}
+func (a *AWIrisAlternate2) unpackResponse(cmd string) {
+	a.unpackRequest(cmd)
+}
+func (a *AWIrisAlternate2) packResponse() string {
+	return a.packRequest()
+}
+
+// AWIrisQueryAlternate2 requests the current AWIrisAlternate2.
+type AWIrisQueryAlternate2 struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWIrisQueryAlternate2{} }) }
+func (a *AWIrisQueryAlternate2) Acceptable() bool {
+	return true
+}
+func (a *AWIrisQueryAlternate2) Response() AWResponse {
+	return &AWIrisAlternate2{}
+}
+func (a *AWIrisQueryAlternate2) requestSignature() string {
+	return "QSD:4F"
+}
+func (a *AWIrisQueryAlternate2) unpackRequest(_ string) {}
+func (a *AWIrisQueryAlternate2) packRequest() string {
+	return "QSD:4F"
+}
+
+type NDFilter int
+
+const (
+	NDFilterNone NDFilter = iota
+	NDFilter1_4
+	NDFilter1_16
+	NDFilter1_64
+	// NDFilterAuto is value 8 is documented, but does not work in practice.
+)
+
+func (n NDFilter) toWire() string {
+	return int2dec(int(n), 1)
+}
+func toNDFilter(s string) NDFilter {
+	return NDFilter(dec2int(s[0:1]))
+}
+func (n NDFilter) Acceptable() bool {
+	return n >= NDFilterNone && n <= NDFilter1_64
+}
+
+// AWNDFilter configures the ND filter on the camera.
+type AWNDFilter struct {
+	Level NDFilter
+}
+
+func init() { registerRequest(func() AWRequest { return &AWNDFilter{} }) }
+func init() { registerResponse(func() AWResponse { return &AWNDFilter{} }) }
+func (a *AWNDFilter) Acceptable() bool {
+	return a.Level.Acceptable()
+}
+func (a *AWNDFilter) Response() AWResponse {
+	return a
+}
+func (a *AWNDFilter) Ok() bool {
+	return true
+}
+func (a *AWNDFilter) requestSignature() string {
+	return "OFT:\x02"
+}
+func (a *AWNDFilter) unpackRequest(cmd string) {
+	a.Level = toNDFilter(cmd[4:5])
+}
+func (a *AWNDFilter) packRequest() string {
+	return "OFT:" + a.Level.toWire()
+}
+func (a *AWNDFilter) responseSignature() string {
+	return a.requestSignature()
+}
+func (a *AWNDFilter) unpackResponse(cmd string) {
+	a.unpackRequest(cmd)
+}
+func (a *AWNDFilter) packResponse() string {
+	return a.packRequest()
+}
+
+// AWNDFilterQuery requests the current ND filter level.
+type AWNDFilterQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWNDFilterQuery{} }) }
+func (a *AWNDFilterQuery) Acceptable() bool {
+	return true
+}
+func (a *AWNDFilterQuery) Response() AWResponse {
+	return &AWNDFilter{}
+}
+func (a *AWNDFilterQuery) requestSignature() string {
+	return "QFT"
+}
+func (a *AWNDFilterQuery) unpackRequest(_ string) {}
+func (a *AWNDFilterQuery) packRequest() string {
+	return "QFT"
+}
+
+// CenteredScale is an arbitrary scale with a middle default. Valid values are
+// between -32 and 32.
+type CenteredScale int
+
+func (c CenteredScale) toWire() string {
+	return int2dec(int(c)+0x32, 2)
+}
+func toCenteredScale(s string) CenteredScale {
+	return CenteredScale(dec2int(s[0:2]) - 0x32)
+}
+func (c CenteredScale) Acceptable() bool {
+	return c >= -32 && c <= 32
+}
+
+// AW contrast level is the contrast level configuration of the camera.
+// In case of AW-UE70, -32 equals to -10, +32 equals to +10 visible in OSD
+type AWContrastLevel struct {
+	Level CenteredScale
+}
+
+func init() { registerRequest(func() AWRequest { return &AWContrastLevel{} }) }
+func init() { registerResponse(func() AWResponse { return &AWContrastLevel{} }) }
+func (a *AWContrastLevel) Acceptable() bool {
+	return a.Level.Acceptable()
+}
+func (a *AWContrastLevel) Response() AWResponse {
+	return a
+}
+func (a *AWContrastLevel) Ok() bool {
+	return true
+}
+func (a *AWContrastLevel) requestSignature() string {
+	return "OSD:48:\x01\x01"
+}
+func (a *AWContrastLevel) unpackRequest(cmd string) {
+	a.Level = toCenteredScale(cmd[7:9])
+}
+func (a *AWContrastLevel) packRequest() string {
+	return "OSD:48:" + a.Level.toWire()
+}
+func (a *AWContrastLevel) responseSignature() string {
+	return a.requestSignature()
+}
+func (a *AWContrastLevel) unpackResponse(cmd string) {
+	a.unpackRequest(cmd)
+}
+func (a *AWContrastLevel) packResponse() string {
+	return a.packRequest()
+}
+
+// AWContrastLevelQuery requests the current AWContrastLevel.
+type AWContrastLevelQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWContrastLevelQuery{} }) }
+func (a *AWContrastLevelQuery) Acceptable() bool {
+	return true
+}
+func (a *AWContrastLevelQuery) Response() AWResponse {
+	return &AWContrastLevel{}
+}
+func (a *AWContrastLevelQuery) requestSignature() string {
+	return "QSD:48"
+}
+func (a *AWContrastLevelQuery) unpackRequest(_ string) {}
+func (a *AWContrastLevelQuery) packRequest() string {
+	return "QSD:48"
+}
+
+// AWLensInformationAlternate is equal to AWLensInformation but has a different
+// wire representation.
+type AWLensInformationAlternate struct {
+	Zoom  ScaleUnit
+	Focus ScaleUnit
+	Iris  ScaleUnit
+}
+
+func init() { registerResponse(func() AWResponse { return &AWLensInformationAlternate{} }) }
+func (a *AWLensInformationAlternate) Acceptable() bool {
+	return true
+}
+func (a *AWLensInformationAlternate) Response() AWResponse {
+	return a
+}
+func (a *AWLensInformationAlternate) Ok() bool {
+	return true
+}
+func (a *AWLensInformationAlternate) responseSignature() string {
+	return "OSI:18:\x01\x01\x01:\x01\x01\x01:\x01\x01\x01"
+}
+func (a *AWLensInformationAlternate) unpackResponse(cmd string) {
+	_ = cmd[17]
+	a.Zoom = toScaleUnit(cmd[7:10])
+	a.Focus = toScaleUnit(cmd[11:14])
+	a.Iris = toScaleUnit(cmd[15:18])
+}
+func (a *AWLensInformationAlternate) packResponse() string {
+	return "OSI:18:" + a.Zoom.toWire() + ":" + a.Focus.toWire() + ":" + a.Iris.toWire()
+}
+
+// AWLensInformationAlternateQuery requests the current AWLensInformationAlternate.
+type AWLensInformationAlternateQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWLensInformationAlternateQuery{} }) }
+func (a *AWLensInformationAlternateQuery) Acceptable() bool {
+	return true
+}
+func (a *AWLensInformationAlternateQuery) Response() AWResponse {
+	return &AWLensInformationAlternate{}
+}
+func (a *AWLensInformationAlternateQuery) requestSignature() string {
+	return "QSI:18"
+}
+func (a *AWLensInformationAlternateQuery) unpackRequest(_ string) {}
+func (a *AWLensInformationAlternateQuery) packRequest() string {
+	return "QSI:18"
+}
+
 // AWOSDMenu configures the on-screen visible camera menu
 type AWOSDMenu struct {
 	Display Toggle
