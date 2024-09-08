@@ -858,7 +858,7 @@ func (a *AWFocus) unpackRequest(cmd string) {
 	a.Focus = toInteractiveSpeed(cmd[2:4])
 }
 func (a *AWFocus) packRequest() string {
-	return "#AF" + a.Focus.toWire()
+	return "#F" + a.Focus.toWire()
 }
 func (a *AWFocus) responseSignature() string {
 	return "fS\x02\x02"
@@ -2492,21 +2492,21 @@ func (a *AWNDFilterQuery) packRequest() string {
 }
 
 // CenteredScale is an arbitrary scale with a middle default. Valid values are
-// between -32 and 32.
+// between -100 and +100.
 type CenteredScale int
 
 func (c CenteredScale) toWire() string {
-	return int2dec(int(c)+0x32, 2)
+	return int2hex(int(c)+0x32, 2)
 }
 func toCenteredScale(s string) CenteredScale {
-	return CenteredScale(dec2int(s[0:2]) - 0x32)
+	return CenteredScale(hex2int(s[0:2]) - 0x32)
 }
 func (c CenteredScale) Acceptable() bool {
 	return c >= -32 && c <= 32
 }
 
 // AW contrast level is the contrast level configuration of the camera.
-// In case of AW-UE70, -32 equals to -10, +32 equals to +10 visible in OSD
+// In case of AW-UE70, -100 equals to -10, +100 equals to +10 visible in OSD
 type AWContrastLevel struct {
 	Level CenteredScale
 }
