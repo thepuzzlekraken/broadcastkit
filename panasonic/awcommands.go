@@ -1,5 +1,7 @@
 package panasonic
 
+import "strings"
+
 // PowerSwitch represent the status of the virtual power switch
 type PowerSwitch byte
 
@@ -261,6 +263,22 @@ type SpeedUnit struct {
 // SpeedTable is the lookup table used by SpeedUnit
 type SpeedTable int
 
+func (t SpeedTable) toWire() string {
+	tb := t
+	if tb == DefaultSpeed {
+		tb = FastSpeed
+	}
+	return int2dec(int(tb)-1, 1)
+}
+
+func toSpeedTable(dec string) SpeedTable {
+	return SpeedTable(dec2int(dec[0:1]) + 1)
+}
+
+func (t SpeedTable) Acceptable() bool {
+	return t >= DefaultSpeed && t <= FastSpeed
+}
+
 const (
 	// Values are offset by one to Panasonic definition, to allow for default
 	DefaultSpeed SpeedTable = 0
@@ -270,24 +288,20 @@ const (
 )
 
 func (s SpeedUnit) Acceptable() bool {
-	return s.Speed >= 0 && s.Speed <= 30 && s.Table >= 0 && s.Table <= 3
+	return s.Speed >= 0 && s.Speed <= 30 && s.Table.Acceptable()
 }
 func (s SpeedUnit) toWire() string {
 	sp := s.Speed
 	if sp == 0 {
 		sp = 9
 	}
-	tb := s.Table
-	if tb == DefaultSpeed {
-		tb = FastSpeed
-	}
-	return int2hex(sp, 2) + int2dec(int(tb)-1, 1)
+	return int2hex(sp, 2) + s.Table.toWire()
 }
 func toSpeedUnit(data string) SpeedUnit {
 	_ = data[3]
 	return SpeedUnit{
-		Speed: hex2int(data[0:2]),
-		Table: SpeedTable(dec2int(data[2:3]) + 1),
+		Speed: int(hex2int(data[0:2])),
+		Table: toSpeedTable(data[2:3]),
 	}
 }
 
@@ -573,7 +587,11 @@ func (a *AWPanTilt) packResponse() string {
 type ScaleUnit int
 
 func (s ScaleUnit) toWire() string {
-	// Panasonic API uses 0x555 as lowest value
+	if s > 4095 {
+		// Avoid invalid high values becoming a valid FFF
+		return "000"
+	}
+	// Panasonic API uses the range 0x555 to 0xFFF
 	return int2hex(int(s)+0x555, 3)
 }
 
@@ -722,6 +740,398 @@ func (a *AWZoom) packResponse() string {
 	return "zS" + a.Zoom.toWire()
 }
 
+// AWFocusTo commands a focus movement to a specific position on the scale.
+type AWFocusTo struct {
+	Focus ScaleUnit
+}
+
+func init() { registerRequest(func() AWRequest { return &AWFocusTo{} }) }
+func init() { registerResponse(func() AWResponse { return &AWFocusTo{} }) }
+func (a *AWFocusTo) Ok() bool {
+	return true
+}
+func (a *AWFocusTo) Acceptable() bool {
+	return a.Focus.Acceptable()
+}
+func (a *AWFocusTo) Response() AWResponse {
+	return a
+}
+func (a *AWFocusTo) requestSignature() string {
+	return "#AXF\x01\x01\x01"
+}
+func (a *AWFocusTo) unpackRequest(cmd string) {
+	a.Focus = toScaleUnit(cmd[4:7])
+}
+func (a *AWFocusTo) packRequest() string {
+	return "#AXF" + a.Focus.toWire()
+}
+func (a *AWFocusTo) responseSignature() string {
+	return "axf\x01\x01\x01"
+}
+func (a *AWFocusTo) packResponse() string {
+	return "axf" + a.Focus.toWire()
+}
+func (a *AWFocusTo) unpackResponse(cmd string) {
+	a.Focus = toScaleUnit(cmd[3:6])
+}
+
+// AWFocusQuery is a request for the current focus position.
+type AWFocusQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWFocusQuery{} }) }
+func (a *AWFocusQuery) Acceptable() bool {
+	return true
+}
+func (a *AWFocusQuery) Response() AWResponse {
+	return &AWFocusTo{}
+}
+func (a *AWFocusQuery) requestSignature() string {
+	return "#AXF"
+}
+func (a *AWFocusQuery) unpackRequest(_ string) {}
+func (a *AWFocusQuery) packRequest() string {
+	return "#AXF"
+}
+
+// AWFocusResponseAlternate is the answer to AWFocusQueryAlternate requests
+type AWFocusResponseAlternate struct {
+	Focus ScaleUnit
+}
+
+func init() { registerResponse(func() AWResponse { return &AWFocusResponseAlternate{} }) }
+func (a *AWFocusResponseAlternate) Ok() bool {
+	return true
+}
+func (a *AWFocusResponseAlternate) responseSignature() string {
+	// There's a special case of gz--- which is returned instead of an eR2 error
+	// when the camera is suspended. We'll just leave that for UnknownResponse.
+	return "gf\x01\x01\x01"
+}
+func (a *AWFocusResponseAlternate) unpackResponse(cmd string) {
+	a.Focus = toScaleUnit(cmd[2:5])
+}
+func (a *AWFocusResponseAlternate) packResponse() string {
+	return "gf" + a.Focus.toWire()
+}
+
+// AWFocusQueryAlternate requests informationabout the current focus position.
+// This is functionally equivalent to an AWFocusQuery request, but it is sent as
+// a different command to the camera. Yields AWFocusResponseAlternate instead of
+// AWFocusTo.
+type AWFocusQueryAlternate struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWFocusQueryAlternate{} }) }
+func (a *AWFocusQueryAlternate) Acceptable() bool {
+	return true
+}
+func (a *AWFocusQueryAlternate) Response() AWResponse {
+	return &AWFocusResponseAlternate{}
+}
+func (a *AWFocusQueryAlternate) requestSignature() string {
+	return "#GF"
+}
+func (a *AWFocusQueryAlternate) unpackRequest(_ string) {}
+func (a *AWFocusQueryAlternate) packRequest() string {
+	return "#GF"
+}
+
+// AWFocus commands a continuous focus movement with a given speed.
+type AWFocus struct {
+	Focus ContinuousSpeed
+}
+
+func init() { registerRequest(func() AWRequest { return &AWFocus{} }) }
+func init() { registerResponse(func() AWResponse { return &AWFocus{} }) }
+func (a *AWFocus) Acceptable() bool {
+	return a.Focus.Acceptable()
+}
+func (a *AWFocus) Response() AWResponse {
+	return a
+}
+func (a *AWFocus) Ok() bool {
+	return true
+}
+func (a *AWFocus) requestSignature() string {
+	return "#F\x02\x02"
+}
+func (a *AWFocus) unpackRequest(cmd string) {
+	a.Focus = toInteractiveSpeed(cmd[2:4])
+}
+func (a *AWFocus) packRequest() string {
+	return "#AF" + a.Focus.toWire()
+}
+func (a *AWFocus) responseSignature() string {
+	return "fS\x02\x02"
+}
+func (a *AWFocus) unpackResponse(cmd string) {
+	a.Focus = toInteractiveSpeed(cmd[2:4])
+}
+func (a *AWFocus) packResponse() string {
+	return "fS" + a.Focus.toWire()
+}
+
+// AWAutoFocus configures the camera's autofocus functionality.
+type AWAutoFocus struct {
+	AutoFocus Toggle
+}
+
+func init() { registerRequest(func() AWRequest { return &AWAutoFocus{} }) }
+func init() { registerResponse(func() AWResponse { return &AWAutoFocus{} }) }
+func (a *AWAutoFocus) Acceptable() bool {
+	return a.AutoFocus.Acceptable()
+}
+func (a *AWAutoFocus) Response() AWResponse {
+	return a
+}
+func (a *AWAutoFocus) Ok() bool {
+	return true
+}
+func (a *AWAutoFocus) requestSignature() string {
+	return "#D1\x02"
+}
+func (a *AWAutoFocus) unpackRequest(cmd string) {
+	a.AutoFocus = toToggle(cmd[3:4])
+}
+func (a *AWAutoFocus) packRequest() string {
+	return "#D1" + a.AutoFocus.toWire()
+}
+func (a *AWAutoFocus) responseSignature() string {
+	return "d1\x02"
+}
+func (a *AWAutoFocus) unpackResponse(cmd string) {
+	a.AutoFocus = toToggle(cmd[2:3])
+}
+func (a *AWAutoFocus) packResponse() string {
+	return "d1" + a.AutoFocus.toWire()
+}
+
+// AWAutoFocusQuery requests information about the current autofocus status.
+type AWAutoFocusQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWAutoFocusQuery{} }) }
+func (a *AWAutoFocusQuery) Acceptable() bool {
+	return true
+}
+func (a *AWAutoFocusQuery) Response() AWResponse {
+	return &AWAutoFocus{}
+}
+func (a *AWAutoFocusQuery) requestSignature() string {
+	return "#D1"
+}
+func (a *AWAutoFocusQuery) unpackRequest(_ string) {}
+func (a *AWAutoFocusQuery) packRequest() string {
+	return "#D2"
+}
+
+// AWIrisTo commands the camera to set the iris to a specific value.
+type AWIrisTo struct {
+	Iris ScaleUnit
+}
+
+func init() { registerRequest(func() AWRequest { return &AWIrisTo{} }) }
+func init() { registerResponse(func() AWResponse { return &AWIrisTo{} }) }
+func (a *AWIrisTo) Acceptable() bool {
+	return a.Iris.Acceptable()
+}
+func (a *AWIrisTo) Response() AWResponse {
+	return a
+}
+func (a *AWIrisTo) Ok() bool {
+	return true
+}
+func (a *AWIrisTo) requestSignature() string {
+	return "#AXI\x01\x01\x01"
+}
+func (a *AWIrisTo) unpackRequest(cmd string) {
+	a.Iris = toScaleUnit(cmd[4:7])
+}
+func (a *AWIrisTo) packRequest() string {
+	return "#AXI" + a.Iris.toWire()
+}
+func (a *AWIrisTo) responseSignature() string {
+	return "axi\x01\x01\x01"
+}
+func (a *AWIrisTo) unpackResponse(cmd string) {
+	a.Iris = toScaleUnit(cmd[3:6])
+}
+func (a *AWIrisTo) packResponse() string {
+	return "axi" + a.Iris.toWire()
+}
+
+// AWIrisQuery requests information about the current iris position.
+type AWIrisQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWIrisQuery{} }) }
+func (a *AWIrisQuery) Acceptable() bool {
+	return true
+}
+func (a *AWIrisQuery) Response() AWResponse {
+	return &AWIrisTo{}
+}
+func (a *AWIrisQuery) requestSignature() string {
+	return "#AXI"
+}
+func (a *AWIrisQuery) unpackRequest(_ string) {}
+func (a *AWIrisQuery) packRequest() string {
+	return "#AXI"
+}
+
+// LimitedScaleUnit represents a scale unit on a specific range.
+//
+// Zero value is an unacceptable value.
+// A value of 1 is the near-and (closed) 99 is the far-end (open)
+// Values outside the range 1 to 99 cause ErrUnacceptable
+type LimitedScaleUnit int
+
+func (l LimitedScaleUnit) toWire() string {
+	if !l.Acceptable() {
+		return "00"
+	}
+	return int2dec(int(l), 2)
+}
+func toLimitedScaleUnit(s string) LimitedScaleUnit {
+	return LimitedScaleUnit(dec2int(s[0:2]))
+}
+func (c LimitedScaleUnit) Acceptable() bool {
+	if c < 1 || c > 99 {
+		return false
+	}
+	return true
+}
+
+// AWIris commands the camera iris to a specific value, just like AWIrisTo.
+//
+// Although syntactically alike, this is *not* a continous movement. This
+// command is important for compatibility, but new codes should prefer AWIrisTo.
+type AWIris struct {
+	Iris LimitedScaleUnit
+}
+
+func init() { registerRequest(func() AWRequest { return &AWIris{} }) }
+func init() { registerResponse(func() AWResponse { return &AWIris{} }) }
+func (a *AWIris) Acceptable() bool {
+	return a.Iris.Acceptable()
+}
+func (a *AWIris) Response() AWResponse {
+	return a
+}
+func (a *AWIris) Ok() bool {
+	return true
+}
+func (a *AWIris) requestSignature() string {
+	return "#I\x02\x02"
+}
+func (a *AWIris) unpackRequest(cmd string) {
+	a.Iris = toLimitedScaleUnit(cmd[2:4])
+}
+func (a *AWIris) packRequest() string {
+	return "#I" + a.Iris.toWire()
+}
+func (a *AWIris) responseSignature() string {
+	return "iC\x02\x02"
+}
+func (a *AWIris) unpackResponse(cmd string) {
+	a.Iris = toLimitedScaleUnit(cmd[2:4])
+}
+func (a *AWIris) packResponse() string {
+	return "iC" + a.Iris.toWire()
+}
+
+// AWAutoIris configures the camera automatic iris control
+type AWAutoIris struct {
+	AutoIris Toggle
+}
+
+func init() { registerRequest(func() AWRequest { return &AWAutoIris{} }) }
+func init() { registerResponse(func() AWResponse { return &AWAutoIris{} }) }
+func (a *AWAutoIris) Acceptable() bool {
+	return a.AutoIris.Acceptable()
+}
+func (a *AWAutoIris) Response() AWResponse {
+	return a
+}
+func (a *AWAutoIris) Ok() bool {
+	return true
+}
+func (a *AWAutoIris) requestSignature() string {
+	return "#D3\x02"
+}
+func (a *AWAutoIris) unpackRequest(cmd string) {
+	a.AutoIris = toToggle(cmd[3:4])
+}
+func (a *AWAutoIris) packRequest() string {
+	return "#d3" + a.AutoIris.toWire()
+}
+func (a *AWAutoIris) responseSignature() string {
+	return "d3\x02"
+}
+func (a *AWAutoIris) unpackResponse(cmd string) {
+	a.AutoIris = toToggle(cmd[2:3])
+}
+func (a *AWAutoIris) packResponse() string {
+	return "d3" + a.AutoIris.toWire()
+}
+
+// AWAutoIrisQuery requests the current automatic iris control configuration.
+type AWAutoIrisQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWAutoIrisQuery{} }) }
+func (a *AWAutoIrisQuery) Acceptable() bool {
+	return true
+}
+func (a *AWAutoIrisQuery) Response() AWResponse {
+	return &AWAutoIris{}
+}
+func (a *AWAutoIrisQuery) requestSignature() string {
+	return "#D3"
+}
+func (a *AWAutoIrisQuery) unpackRequest(_ string) {}
+func (a *AWAutoIrisQuery) packRequest() string {
+	return "#D3"
+}
+
+// AWCombinedIrisQuery requests the current iris position and configuration.
+type AWCombinedIrisQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWCombinedIrisQuery{} }) }
+func (a *AWCombinedIrisQuery) Acceptable() bool {
+	return true
+}
+func (a *AWCombinedIrisQuery) Response() AWResponse {
+	return &AWCombinedIrisInfo{}
+}
+func (a *AWCombinedIrisQuery) requestSignature() string {
+	return "#GI"
+}
+func (a *AWCombinedIrisQuery) unpackRequest(_ string) {}
+func (a *AWCombinedIrisQuery) packRequest() string {
+	return "#GI"
+}
+
+// AWCombinedIrisInfo is a response to AWCombinedIrisQuery.
+type AWCombinedIrisInfo struct {
+	Iris     ScaleUnit
+	AutoIris Toggle
+}
+
+func init() { registerResponse(func() AWResponse { return &AWCombinedIrisInfo{} }) }
+func (a *AWCombinedIrisInfo) Ok() bool {
+	return true
+}
+func (a *AWCombinedIrisInfo) responseSignature() string {
+	// The --- as iris position is a "busy error". It will be left for Unknown
+	// response in this case.
+	return "gi\x01\x01\x01\x02"
+}
+func (a *AWCombinedIrisInfo) unpackResponse(cmd string) {
+	_ = cmd[5]
+	a.Iris = toScaleUnit(cmd[2:5])
+	a.AutoIris = toToggle(cmd[5:6])
+}
+func (a *AWCombinedIrisInfo) packResponse() string {
+	return "gi" + a.Iris.toWire() + a.AutoIris.toWire()
+}
+
 // Preset is a camera-stored preset number
 //
 // The camera has 100 presets, numbered 0-99. Values outside of that range will
@@ -734,8 +1144,419 @@ func (p Preset) toWire() string {
 func toPreset(s string) Preset {
 	return Preset(dec2int(s[0:2]))
 }
+func (p Preset) Acceptable() bool {
+	// All wire-representable values are acceptable.
+	return true
+}
 
-// AWPresetPlayback is a special response that only appears in notifications
+// AWPreset is a generic reply, indicating the affected preset number.
+//
+// Most requests affecting presets will return this response instead of
+// themselves.
+type AWPreset struct {
+	Preset Preset
+}
+
+func init() { registerResponse(func() AWResponse { return &AWPreset{} }) }
+func (a *AWPreset) Ok() bool {
+	return true
+}
+func (a *AWPreset) responseSignature() string {
+	return "s\x02\x02"
+}
+func (a *AWPreset) unpackResponse(cmd string) {
+	a.Preset = toPreset(cmd[1:3])
+}
+func (a *AWPreset) packResponse() string {
+	return "s" + a.Preset.toWire()
+}
+
+// AWPresetRegister saves the current camera position as a preset.
+type AWPresetRegister struct {
+	Preset Preset
+}
+
+func init() { registerRequest(func() AWRequest { return &AWPresetRegister{} }) }
+func (a *AWPresetRegister) Acceptable() bool {
+	return a.Preset.Acceptable()
+}
+func (a *AWPresetRegister) Response() AWResponse {
+	return &AWPreset{Preset: a.Preset}
+}
+func (a *AWPresetRegister) requestSignature() string {
+	return "#P\x02\x02"
+}
+func (a *AWPresetRegister) unpackRequest(cmd string) {
+	a.Preset = toPreset(cmd[2:4])
+}
+func (a *AWPresetRegister) packRequest() string {
+	return "#P" + a.Preset.toWire()
+}
+
+// AWPresetRecall commands the camera to obtain the specified preset position.
+type AWPresetRecall struct {
+	Preset Preset
+}
+
+func init() { registerRequest(func() AWRequest { return &AWPresetRecall{} }) }
+func (a *AWPresetRecall) Acceptable() bool {
+	return a.Preset.Acceptable()
+}
+func (a *AWPresetRecall) Response() AWResponse {
+	return &AWPreset{Preset: a.Preset}
+}
+func (a *AWPresetRecall) requestSignature() string {
+	return "#R\x02\x02"
+}
+func (a *AWPresetRecall) unpackRequest(cmd string) {
+	a.Preset = toPreset(cmd[2:4])
+}
+func (a *AWPresetRecall) packRequest() string {
+	return "#R" + a.Preset.toWire()
+}
+
+// AWPresetClear cleares the specified preset position data.
+type AWPresetClear struct {
+	Preset Preset
+}
+
+func init() { registerRequest(func() AWRequest { return &AWPresetClear{} }) }
+func (a *AWPresetClear) Acceptable() bool {
+	return a.Preset.Acceptable()
+}
+func (a *AWPresetClear) Response() AWResponse {
+	return &AWPreset{Preset: a.Preset}
+}
+func (a *AWPresetClear) requestSignature() string {
+	return "#C\x02\x02"
+}
+func (a *AWPresetClear) unpackRequest(cmd string) {
+	a.Preset = toPreset(cmd[2:4])
+}
+func (a *AWPresetClear) packRequest() string {
+	return "#C" + a.Preset.toWire()
+}
+
+// AWPresetQuery returns the last preset position the camera was commanded to.
+type AWPresetQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWPresetQuery{} }) }
+func (a *AWPresetQuery) Acceptable() bool {
+	return true
+}
+func (a *AWPresetQuery) Response() AWResponse {
+	return &AWPreset{}
+}
+func (a *AWPresetQuery) requestSignature() string {
+	return "#S"
+}
+func (a *AWPresetQuery) unpackRequest(_ string) {}
+func (a *AWPresetQuery) packRequest() string {
+	return "#S"
+}
+
+// HighSpeedUnit is a higher-resolution unit of motion speed.
+//
+// A Zero value is the factory-default value of approx 780.
+// A HighSpeedUnit of 1 is equivalent to a SpeedUnit of 1.
+// A HighSpeedUnit of 780 is equivalent to a SpeedUnit of 30.
+//
+// SpeedTable also applies to HighSpeedUnit, but it is provided separately.
+// Mapping between HighSpeedUnit and SpeedUnit is a lossy conversion.
+//
+// TODO(zsh): Support timing-based HighSpeedUnit values for AW-UE150 cameras
+type HighSpeedUnit int
+
+func (s HighSpeedUnit) Acceptable() bool {
+	// Altough not all values are valid, cameras never return AWErrUnacceptable
+	return true
+}
+func (s HighSpeedUnit) toWire() string {
+	var sp HighSpeedUnit
+	// s == 0 is handled by the camera
+	switch {
+	case s == 0:
+		// unlike SpeedUnit, zero HighSpeedUnit is handled by the camera
+		sp = 0
+	case s > 0 && s <= 750:
+		// map 1-750 to 250-999
+		sp = s + 249
+	case s < 0 && s >= -999:
+		// keep invalid values for proxying
+		sp = -s
+	default:
+		// #UPVS never returns invalid in practice. Use default instead.
+		sp = 0
+	}
+	return int2dec(int(sp), 3)
+}
+func toHighSpeedUnit(data string) HighSpeedUnit {
+	u := HighSpeedUnit(dec2int(data[0:3]))
+	switch {
+	case u == 0:
+		return HighSpeedUnit(0)
+	case u >= 250 && u <= 999:
+		// map 250-999 to 1-750
+		return HighSpeedUnit(u - 249)
+	default:
+		// keep invalid values for proxying
+		return HighSpeedUnit(-u)
+	}
+}
+
+// AWPresetSpeed configures the speed at which presets are recalled.
+type AWPresetSpeed struct {
+	Speed HighSpeedUnit
+}
+
+func init() { registerRequest(func() AWRequest { return &AWPresetSpeed{} }) }
+func init() { registerResponse(func() AWResponse { return &AWPresetSpeed{} }) }
+func (a *AWPresetSpeed) Acceptable() bool {
+	return a.Speed.Acceptable()
+}
+func (a *AWPresetSpeed) Response() AWResponse {
+	return a
+}
+func (a *AWPresetSpeed) Ok() bool {
+	return true
+}
+func (a *AWPresetSpeed) requestSignature() string {
+	return "#UPVS\x02\x02\x02"
+}
+func (a *AWPresetSpeed) unpackRequest(cmd string) {
+	a.Speed = toHighSpeedUnit(cmd[5:8])
+}
+func (a *AWPresetSpeed) packRequest() string {
+	return "#UPVS" + a.Speed.toWire()
+}
+func (a *AWPresetSpeed) responseSignature() string {
+	return "uPVS\x02\x02\x02"
+}
+func (a *AWPresetSpeed) unpackResponse(cmd string) {
+	a.Speed = toHighSpeedUnit(cmd[4:7])
+}
+func (a *AWPresetSpeed) packResponse() string {
+	return "uPVS" + a.Speed.toWire()
+}
+
+// AWPresetSpeedQuery requests the current AWPresetSpeed setting.
+type AWPresetSpeedQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWPresetSpeedQuery{} }) }
+func (a *AWPresetSpeedQuery) Acceptable() bool {
+	return true
+}
+func (a *AWPresetSpeedQuery) Response() AWResponse {
+	return &AWPresetSpeed{}
+}
+func (a *AWPresetSpeedQuery) requestSignature() string {
+	return "#UPVS"
+}
+func (a *AWPresetSpeedQuery) unpackRequest(_ string) {}
+func (a *AWPresetSpeedQuery) packRequest() string {
+	return "#UPVS"
+}
+
+// AWPresetFreeze configures camera image freeze during preset operations.
+type AWPresetFreeze struct {
+	Freeze Toggle
+}
+
+func init() { registerRequest(func() AWRequest { return &AWPresetFreeze{} }) }
+func init() { registerResponse(func() AWResponse { return &AWPresetFreeze{} }) }
+func (a *AWPresetFreeze) Acceptable() bool {
+	return a.Freeze.Acceptable()
+}
+func (a *AWPresetFreeze) Response() AWResponse {
+	return a
+}
+func (a *AWPresetFreeze) Ok() bool {
+	return true
+}
+func (a *AWPresetFreeze) requestSignature() string {
+	return "#PRF\x02"
+}
+func (a *AWPresetFreeze) unpackRequest(cmd string) {
+	a.Freeze = toToggle(cmd[4:5])
+}
+func (a *AWPresetFreeze) packRequest() string {
+	return "#PRF" + a.Freeze.toWire()
+}
+func (a *AWPresetFreeze) responseSignature() string {
+	return "pRF\x02"
+}
+func (a *AWPresetFreeze) unpackResponse(cmd string) {
+	a.Freeze = toToggle(cmd[3:4])
+}
+func (a *AWPresetFreeze) packResponse() string {
+	return "pRF" + a.Freeze.toWire()
+}
+
+// AWPresetFreezeQuery requests the current AWPresetFreeze setting.
+type AWPresetFreezeQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWPresetFreezeQuery{} }) }
+func (a *AWPresetFreezeQuery) Acceptable() bool {
+	return true
+}
+func (a *AWPresetFreezeQuery) Response() AWResponse {
+	return &AWPresetFreeze{}
+}
+func (a *AWPresetFreezeQuery) requestSignature() string {
+	return "#PRF"
+}
+func (a *AWPresetFreezeQuery) unpackRequest(_ string) {}
+func (a *AWPresetFreezeQuery) packRequest() string {
+	return "#PRF"
+}
+
+type AWPresetSpeedTable struct {
+	Table SpeedTable
+}
+
+func init() { registerRequest(func() AWRequest { return &AWPresetSpeedTable{} }) }
+func init() { registerResponse(func() AWResponse { return &AWPresetSpeedTable{} }) }
+func (a *AWPresetSpeedTable) Acceptable() bool {
+	return a.Table.Acceptable()
+}
+func (a *AWPresetSpeedTable) Response() AWResponse {
+	return a
+}
+func (a *AWPresetSpeedTable) Ok() bool {
+	return true
+}
+func (a *AWPresetSpeedTable) requestSignature() string {
+	return "#PST\x02"
+}
+func (a *AWPresetSpeedTable) unpackRequest(cmd string) {
+	a.Table = toSpeedTable(cmd[4:5])
+}
+func (a *AWPresetSpeedTable) packRequest() string {
+	return "#PST" + a.Table.toWire()
+}
+func (a *AWPresetSpeedTable) responseSignature() string {
+	return "pST\x02"
+}
+func (a *AWPresetSpeedTable) unpackResponse(cmd string) {
+	a.Table = toSpeedTable(cmd[3:4])
+}
+func (a *AWPresetSpeedTable) packResponse() string {
+	return "pST" + a.Table.toWire()
+}
+
+type FuseOffset int
+
+func (f FuseOffset) Acceptable() bool {
+	return f >= 0 && f <= 2
+}
+func (f FuseOffset) toWire() string {
+	return int2hex(int(f), 2)
+}
+func toFuseOffset(data string) FuseOffset {
+	return FuseOffset(dec2int(data[0:2]))
+}
+
+// AWPresetEntries returns a bitmask of the stored presets.
+//
+// Due the the on-wire representation, a single command can not represent all
+// 100 presets available. Presets are returned in groups of 40, defined by
+// the offset parameter:
+// offset(0) -> preset 0-39
+// offset(1) -> preset 40-79
+// offset(2) -> preset 80-119 (unused above 99)
+// The Entries field is always a full bitmask, with non-representative bits
+// set to 0 when received. Non-represnetative bits are ignored when sending.
+type AWPresetEntries struct {
+	Offset  FuseOffset
+	Entries FuseSet
+}
+
+func init() { registerResponse(func() AWResponse { return &AWPresetEntries{} }) }
+func (a *AWPresetEntries) Ok() bool {
+	return true
+}
+func (a *AWPresetEntries) responseSignature() string {
+	return "pE\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01"
+}
+func (a *AWPresetEntries) unpackResponse(cmd string) {
+	_ = cmd[13]
+	a.Offset = toFuseOffset(cmd[2:4])
+	f := FuseSet{}
+	f[1] |= uint32(strings.IndexByte(hexAlphabet, cmd[4])&0xF) << 4
+	f[1] |= uint32(strings.IndexByte(hexAlphabet, cmd[5])&0xF) << 0
+	f[0] |= uint32(strings.IndexByte(hexAlphabet, cmd[6])&0xF) << 28
+	f[0] |= uint32(strings.IndexByte(hexAlphabet, cmd[7])&0xF) << 24
+	f[0] |= uint32(strings.IndexByte(hexAlphabet, cmd[8])&0xF) << 20
+	f[0] |= uint32(strings.IndexByte(hexAlphabet, cmd[9])&0xF) << 16
+	f[0] |= uint32(strings.IndexByte(hexAlphabet, cmd[10])&0xF) << 12
+	f[0] |= uint32(strings.IndexByte(hexAlphabet, cmd[11])&0xF) << 8
+	f[0] |= uint32(strings.IndexByte(hexAlphabet, cmd[12])&0xF) << 4
+	f[0] |= uint32(strings.IndexByte(hexAlphabet, cmd[13])&0xF) << 0
+	a.Entries = f.ShiftLeft(uint(40 * a.Offset))
+}
+func (a *AWPresetEntries) packResponse() string {
+	o := a.Offset
+	if o < 0 {
+		// represent invalid offsets as invalid
+		return "pEFF0000000000"
+	}
+	s := make([]byte, 14)
+	copy(s, "pE")
+	copy(s[2:], o.toWire())
+	f := a.Entries.ShiftRight(uint(40 * a.Offset))
+	s[4] = hexAlphabet[(f[1]>>4)&0xF]
+	s[5] = hexAlphabet[(f[1]>>0)&0xF]
+	s[6] = hexAlphabet[(f[0]>>28)&0xF]
+	s[7] = hexAlphabet[(f[0]>>24)&0xF]
+	s[8] = hexAlphabet[(f[0]>>20)&0xF]
+	s[9] = hexAlphabet[(f[0]>>16)&0xF]
+	s[10] = hexAlphabet[(f[0]>>12)&0xF]
+	s[11] = hexAlphabet[(f[0]>>8)&0xF]
+	s[12] = hexAlphabet[(f[0]>>4)&0xF]
+	s[13] = hexAlphabet[(f[0]>>0)&0xF]
+	return string(s)
+}
+
+// Mask returns a bitmask of the bits valid on the given preset offset.
+//
+// This function helps to determine the bits valid inside an AWPresetEntries
+func (o FuseOffset) Mask() FuseSet {
+	if o < 0 {
+		return FuseSet{0x0, 0x0, 0x0, 0x0}
+	}
+	return FuseSet{0xFFFFFFFF, 0xFF, 0x0, 0x0}.ShiftLeft(uint(o * 10))
+}
+
+// Offset returns the Offset capable of representing this Preset.
+//
+// This function helps to determine the offset to use in AWPresetEntries
+func (p Preset) Offset() FuseOffset {
+	return FuseOffset(int(p) / 10)
+}
+
+type AWPresetEntriesQuery struct {
+	Offset FuseOffset
+}
+
+func init() { registerRequest(func() AWRequest { return &AWPresetEntriesQuery{} }) }
+func (a *AWPresetEntriesQuery) Acceptable() bool {
+	return a.Offset.Acceptable()
+}
+func (a *AWPresetEntriesQuery) Response() AWResponse {
+	return &AWPresetEntries{Offset: a.Offset}
+}
+func (a *AWPresetEntriesQuery) requestSignature() string {
+	return "#PE\x01\x01"
+}
+func (a *AWPresetEntriesQuery) unpackRequest(cmd string) {
+	a.Offset = toFuseOffset(cmd[3:5])
+}
+func (a *AWPresetEntriesQuery) packRequest() string {
+	return "#PE" + a.Offset.toWire()
+}
+
+// AWPresetPlayback is a response indicating a preset position has just been
+// reached by the camera.
 //
 // This indicates that a camera has reached a specific preset location that it
 // was previously commanded to.
@@ -757,6 +1578,413 @@ func (a *AWPresetPlayback) packResponse() string {
 	return "q" + a.Preset.toWire()
 }
 
+// AWTallyEnable is a request to turn on/off the tally light functionality.
+//
+// This is a global configuration to enable/disable the functionality. To light
+// up the tally light, a tally GPI also have to be pulled or the AWTallySet
+// command used.
+type AWTallyEnable struct {
+	TallyEnable Toggle
+}
+
+func init() { registerRequest(func() AWRequest { return &AWTallyEnable{} }) }
+func init() { registerResponse(func() AWResponse { return &AWTallyEnable{} }) }
+func (a *AWTallyEnable) Acceptable() bool {
+	return a.TallyEnable.Acceptable()
+}
+func (a *AWTallyEnable) Response() AWResponse {
+	return a
+}
+func (a *AWTallyEnable) Ok() bool {
+	return true
+}
+func (a *AWTallyEnable) requestSignature() string {
+	return "#TAE\x02"
+}
+func (a *AWTallyEnable) unpackRequest(cmd string) {
+	a.TallyEnable = toToggle(cmd[4:5])
+}
+func (a *AWTallyEnable) packRequest() string {
+	return "#TAE" + a.TallyEnable.toWire()
+}
+func (a *AWTallyEnable) responseSignature() string {
+	return "tAE\x02"
+}
+func (a *AWTallyEnable) unpackResponse(cmd string) {
+	a.TallyEnable = toToggle(cmd[2:3])
+}
+func (a *AWTallyEnable) packResponse() string {
+	return "tAE" + a.TallyEnable.toWire()
+}
+
+// AWTallyEnableQuery is a request to query the current tally configuration
+type AWTallyEnableQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWTallyEnableQuery{} }) }
+func (a *AWTallyEnableQuery) Acceptable() bool {
+	return true
+}
+func (a *AWTallyEnableQuery) Response() AWResponse {
+	return &AWTallyEnable{}
+}
+func (a *AWTallyEnableQuery) requestSignature() string {
+	return "#TAE"
+}
+func (a *AWTallyEnableQuery) unpackRequest(_ string) {}
+func (a *AWTallyEnableQuery) packRequest() string {
+	return "#TAE"
+}
+
+// AWTallySet is a request to turn on/off the tally light
+type AWTallySet struct {
+	TallyLight Toggle
+}
+
+func init() { registerRequest(func() AWRequest { return &AWTallySet{} }) }
+func init() { registerResponse(func() AWResponse { return &AWTallySet{} }) }
+func (a *AWTallySet) Acceptable() bool {
+	return a.TallyLight.Acceptable()
+}
+func (a *AWTallySet) Response() AWResponse {
+	return a
+}
+func (a *AWTallySet) Ok() bool {
+	return true
+}
+func (a *AWTallySet) requestSignature() string {
+	return "#DA\x02"
+}
+func (a *AWTallySet) unpackRequest(cmd string) {
+	a.TallyLight = toToggle(cmd[3:4])
+}
+func (a *AWTallySet) packRequest() string {
+	return "#DA" + a.TallyLight.toWire()
+}
+func (a *AWTallySet) responseSignature() string {
+	return "dA\x02"
+}
+func (a *AWTallySet) unpackResponse(cmd string) {
+	a.TallyLight = toToggle(cmd[2:3])
+}
+func (a *AWTallySet) packResponse() string {
+	return "tA" + a.TallyLight.toWire()
+}
+
+// AWTallyQuery is a request to query the current tally light status
+type AWTallyQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWTallyQuery{} }) }
+func (a *AWTallyQuery) Acceptable() bool {
+	return true
+}
+func (a *AWTallyQuery) Response() AWResponse {
+	return &AWTallySet{}
+}
+func (a *AWTallyQuery) requestSignature() string {
+	return "#DA"
+}
+func (a *AWTallyQuery) unpackRequest(_ string) {}
+func (a *AWTallyQuery) packRequest() string {
+	return "#DA"
+}
+
+// AWWirelessRemote controls the status of remote controller functionality
+type AWWirelessRemote struct {
+	RemoteEnable Toggle
+}
+
+func init() { registerRequest(func() AWRequest { return &AWWirelessRemote{} }) }
+func init() { registerResponse(func() AWResponse { return &AWWirelessRemote{} }) }
+func (a *AWWirelessRemote) Acceptable() bool {
+	return a.RemoteEnable.Acceptable()
+}
+func (a *AWWirelessRemote) Response() AWResponse {
+	return a
+}
+func (a *AWWirelessRemote) Ok() bool {
+	return true
+}
+func (a *AWWirelessRemote) requestSignature() string {
+	return "#WLC\x02"
+}
+func (a *AWWirelessRemote) unpackRequest(cmd string) {
+	a.RemoteEnable = toToggle(cmd[4:5])
+}
+func (a *AWWirelessRemote) packRequest() string {
+	return "#WLC" + a.RemoteEnable.toWire()
+}
+func (a *AWWirelessRemote) responseSignature() string {
+	return "wLC\x02"
+}
+func (a *AWWirelessRemote) unpackResponse(cmd string) {
+	a.RemoteEnable = toToggle(cmd[3:4])
+}
+func (a *AWWirelessRemote) packResponse() string {
+	return "wLC" + a.RemoteEnable.toWire()
+}
+
+// AWWirelessRemoteQuery queries the current wireless remote status
+type AWWirelessRemoteQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWWirelessRemoteQuery{} }) }
+func (a *AWWirelessRemoteQuery) Acceptable() bool {
+	return true
+}
+func (a *AWWirelessRemoteQuery) Response() AWResponse {
+	return &AWWirelessRemote{}
+}
+func (a *AWWirelessRemoteQuery) requestSignature() string {
+	return "#WLC"
+}
+func (a *AWWirelessRemoteQuery) unpackRequest(_ string) {}
+func (a *AWWirelessRemoteQuery) packRequest() string {
+	return "#WLC"
+}
+
+type WirelessRemoteID int
+
+const (
+	RemoteCAM1 = iota
+	RemoteCAM2
+	RemoteCAM3
+	RemoteCAM4
+)
+
+func (w WirelessRemoteID) toWire() string {
+	if w < 0 {
+		w = 9
+	}
+	return int2dec(int(w), 1)
+}
+func toWirelessRemoteID(s string) WirelessRemoteID {
+	return WirelessRemoteID(dec2int(s[0:1]))
+}
+func (w WirelessRemoteID) Acceptable() bool {
+	return w >= RemoteCAM1 && w <= RemoteCAM4
+}
+
+// AWWirelessRemoteID configures the number of the camera on the remote
+type AWWirelessRemoteID struct {
+	RemoteID WirelessRemoteID
+}
+
+func init() { registerRequest(func() AWRequest { return &AWWirelessRemoteID{} }) }
+func init() { registerResponse(func() AWResponse { return &AWWirelessRemoteID{} }) }
+func (a *AWWirelessRemoteID) Acceptable() bool {
+	return a.RemoteID.Acceptable()
+}
+func (a *AWWirelessRemoteID) Response() AWResponse {
+	return a
+}
+func (a *AWWirelessRemoteID) Ok() bool {
+	return true
+}
+func (a *AWWirelessRemoteID) requestSignature() string {
+	return "#RID\x02"
+}
+func (a *AWWirelessRemoteID) unpackRequest(cmd string) {
+	a.RemoteID = toWirelessRemoteID(cmd[4:5])
+}
+func (a *AWWirelessRemoteID) packRequest() string {
+	return "#RID" + a.RemoteID.toWire()
+}
+func (a *AWWirelessRemoteID) responseSignature() string {
+	return "rID\x02"
+}
+func (a *AWWirelessRemoteID) unpackResponse(cmd string) {
+	a.RemoteID = toWirelessRemoteID(cmd[3:4])
+}
+func (a *AWWirelessRemoteID) packResponse() string {
+	return "rID" + a.RemoteID.toWire()
+}
+
+// AWWirelessRemoteIDQuery queries the current wireless remote ID
+type AWWirelessRemoteIDQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWWirelessRemoteIDQuery{} }) }
+func (a *AWWirelessRemoteIDQuery) Acceptable() bool {
+	return true
+}
+func (a *AWWirelessRemoteIDQuery) Response() AWResponse {
+	return &AWWirelessRemoteID{}
+}
+func (a *AWWirelessRemoteIDQuery) requestSignature() string {
+	return "#RID"
+}
+func (a *AWWirelessRemoteIDQuery) unpackRequest(_ string) {}
+func (a *AWWirelessRemoteIDQuery) packRequest() string {
+	return "#RID"
+}
+
+// AWSpeedWithZoom sets the Pan-Tilt speed slower when zoomed in.
+type AWSpeedWithZoom struct {
+	EnableSlowdown Toggle
+}
+
+func init() { registerRequest(func() AWRequest { return &AWSpeedWithZoom{} }) }
+func init() { registerResponse(func() AWResponse { return &AWSpeedWithZoom{} }) }
+func (a *AWSpeedWithZoom) Acceptable() bool {
+	return a.EnableSlowdown.Acceptable()
+}
+func (a *AWSpeedWithZoom) Response() AWResponse {
+	return a
+}
+func (a *AWSpeedWithZoom) Ok() bool {
+	return true
+}
+func (a *AWSpeedWithZoom) requestSignature() string {
+	return "#SWZ\x02"
+}
+func (a *AWSpeedWithZoom) unpackRequest(cmd string) {
+	a.EnableSlowdown = toToggle(cmd[4:5])
+}
+func (a *AWSpeedWithZoom) packRequest() string {
+	return "#SWZ" + a.EnableSlowdown.toWire()
+}
+func (a *AWSpeedWithZoom) responseSignature() string {
+	return "sWZ\x02"
+}
+func (a *AWSpeedWithZoom) unpackResponse(cmd string) {
+	a.EnableSlowdown = toToggle(cmd[3:4])
+}
+func (a *AWSpeedWithZoom) packResponse() string {
+	return "sWZ" + a.EnableSlowdown.toWire()
+}
+
+// AWSpeedWithZoomQuery requests the status of speed with zoom slowdown
+type AWSpeedWithZoomQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWSpeedWithZoomQuery{} }) }
+func (a *AWSpeedWithZoomQuery) Acceptable() bool {
+	return true
+}
+func (a *AWSpeedWithZoomQuery) Response() AWResponse {
+	return &AWSpeedWithZoom{}
+}
+func (a *AWSpeedWithZoomQuery) requestSignature() string {
+	return "#SWZ"
+}
+func (a *AWSpeedWithZoomQuery) unpackRequest(_ string) {}
+func (a *AWSpeedWithZoomQuery) packRequest() string {
+	return "#SWZ"
+}
+
+type HealthCode int
+
+const HealthOk HealthCode = 0x00
+
+func (h HealthCode) toWire() string {
+	if int(h) < 0 {
+		h = 0xFF
+	}
+	return int2hex(int(h), 2)
+}
+func toHealthCode(s string) HealthCode {
+	return HealthCode(hex2int(s[0:2]))
+}
+
+// Problem decides if the health code indicates an issue or if it's fine :-)
+func (h HealthCode) Problem() bool {
+	return h != HealthOk
+}
+
+// AWHealthStatus is information about the camera's phisical healthű
+//
+// The camera documentation refers to these as error codes. We intentionally
+// don't use the term "error" because these are different from both go errors
+// and error replies.
+type AWHealthStatus struct {
+	Code HealthCode
+}
+
+func init() { registerResponse(func() AWResponse { return &AWHealthStatus{} }) }
+
+// OK indicates that this is a successful response. This does not mean that the
+// camera is healthy! See HealthCode.Problem() to check that.
+func (a *AWHealthStatus) Ok() bool {
+	return true
+}
+func (a *AWHealthStatus) responseSignature() string {
+	return "rER\x01\x01"
+}
+func (a *AWHealthStatus) unpackResponse(cmd string) {
+	a.Code = toHealthCode(cmd[3:5])
+}
+func (a *AWHealthStatus) packResponse() string {
+	return "rER\x01\x01" + a.Code.toWire()
+}
+
+type AWHealthQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWHealthQuery{} }) }
+func (a *AWHealthQuery) Acceptable() bool {
+	return true
+}
+func (a *AWHealthQuery) Response() AWResponse {
+	return &AWHealthStatus{}
+}
+func (a *AWHealthQuery) requestSignature() string {
+	return "#RER"
+}
+func (a *AWHealthQuery) unpackRequest(_ string) {}
+func (a *AWHealthQuery) packRequest() string {
+	return "#RER"
+}
+
+// AWOptionSwitch enables or disables the camera option. This is night-mode for
+// all supported cameras.
+type AWOptionSwitch struct {
+	Enable Toggle
+}
+
+func init() { registerRequest(func() AWRequest { return &AWOptionSwitch{} }) }
+func (a *AWOptionSwitch) Acceptable() bool {
+	return a.Enable.Acceptable()
+}
+func (a *AWOptionSwitch) Response() AWResponse {
+	return a
+}
+func (a *AWOptionSwitch) Ok() bool {
+	return true
+}
+func (a *AWOptionSwitch) requestSignature() string {
+	return "#D6\x02"
+}
+func (a *AWOptionSwitch) unpackRequest(cmd string) {
+	a.Enable = toToggle(cmd[3:4])
+}
+func (a *AWOptionSwitch) packRequest() string {
+	return "#D6" + a.Enable.toWire()
+}
+func (a *AWOptionSwitch) responseSignature() string {
+	return "d6\x02"
+}
+func (a *AWOptionSwitch) unpackResponse(cmd string) {
+	a.Enable = toToggle(cmd[2:3])
+}
+func (a *AWOptionSwitch) packResponse() string {
+	return "d6" + a.Enable.toWire()
+}
+
+// AWOptionSwitchQuery requests the status of the camera option. This is
+// night-mode for all supported cameras.
+type AWOptionSwitchQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWOptionSwitchQuery{} }) }
+func (a *AWOptionSwitchQuery) Acceptable() bool {
+	return true
+}
+func (a *AWOptionSwitchQuery) Response() AWResponse {
+	return &AWOptionSwitch{}
+}
+func (a *AWOptionSwitchQuery) requestSignature() string {
+	return "#D6"
+}
+func (a *AWOptionSwitchQuery) unpackRequest(_ string) {}
+func (a *AWOptionSwitchQuery) packRequest() string {
+	return "#D6"
+}
+
 // Toggle is a boolean on/off value which also have invalid values
 type Toggle int
 
@@ -767,7 +1995,7 @@ const (
 
 func (t Toggle) toWire() string {
 	if int(t) < 0 {
-		// keep invalid values when represented on-wire
+		// keep unrepresentable invalid values invalid when sent on-wire
 		t = 9
 	}
 	return int2dec(int(t), 1)
@@ -858,6 +2086,24 @@ func (a *AWLensInformationNotify) packResponse() string {
 	return "lPC" + a.Enabled.toWire()
 }
 
+// AWLensInformationNotifyQuery requests the current AWLensInformationNofity.
+type AWLensInformationNotifyQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWLensInformationNotifyQuery{} }) }
+func (a *AWLensInformationNotifyQuery) Acceptable() bool {
+	return true
+}
+func (a *AWLensInformationNotifyQuery) Response() AWResponse {
+	return &AWLensInformationNotify{}
+}
+func (a *AWLensInformationNotifyQuery) requestSignature() string {
+	return "#LPC"
+}
+func (a *AWLensInformationNotifyQuery) unpackRequest(_ string) {}
+func (a *AWLensInformationNotifyQuery) packRequest() string {
+	return "#LPC"
+}
+
 // AWSoftwareVersion indicates the software version running on the camera
 //
 // Software version information is rarely useful in itself, but it is sent as a
@@ -916,6 +2162,60 @@ func (a *AWSoftwareVersionQuery) unpackRequest(cmd string) {
 }
 func (a *AWSoftwareVersionQuery) packRequest() string {
 	return "#QSV" + int2dec(a.Component, 1)
+}
+
+// AWOSDMenu configures the on-screen visible camera menu
+type AWOSDMenu struct {
+	Display Toggle
+}
+
+func init() { registerResponse(func() AWResponse { return &AWOSDMenu{} }) }
+func init() { registerRequest(func() AWRequest { return &AWOSDMenu{} }) }
+func (a *AWOSDMenu) Acceptable() bool {
+	// 2 is undocumented but accepted
+	return a.Display > 0 && a.Display < 3
+}
+func (a *AWOSDMenu) Response() AWResponse {
+	return a
+}
+func (a *AWOSDMenu) requestSignature() string {
+	return "DUS:\x02"
+}
+func (a *AWOSDMenu) unpackRequest(cmd string) {
+	a.Display = toToggle(cmd[4:5])
+}
+func (a *AWOSDMenu) packRequest() string {
+	return "DUS:" + a.Display.toWire()
+}
+func (a *AWOSDMenu) Ok() bool {
+	return true
+}
+func (a *AWOSDMenu) responseSignature() string {
+	return a.requestSignature()
+}
+func (a *AWOSDMenu) unpackResponse(cmd string) {
+	a.unpackRequest(cmd)
+}
+func (a *AWOSDMenu) packResponse() string {
+	return a.packRequest()
+}
+
+// AWOSDMenuQuery requests an AWOSDMenu status information.
+type AWOSDMenuQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWOSDMenuQuery{} }) }
+func (a *AWOSDMenuQuery) Acceptable() bool {
+	return true
+}
+func (a *AWOSDMenuQuery) Response() AWResponse {
+	return &AWOSDMenu{}
+}
+func (a *AWOSDMenuQuery) requestSignature() string {
+	return "QUS"
+}
+func (a *AWOSDMenuQuery) unpackRequest(_ string) {}
+func (a *AWOSDMenuQuery) packRequest() string {
+	return "QUS"
 }
 
 type AWTitle struct {

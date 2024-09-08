@@ -1,5 +1,76 @@
 package panasonic
 
+// FuseSet is a binary field of 128 bits
+// FuseSet is little-endian: index 0 is the least significant part.
+type FuseSet [4]uint32
+
+func (f FuseSet) Set(i uint8) FuseSet {
+	f[i/32] |= 1 << (i % 32)
+	return f
+}
+func (f FuseSet) Clear(i uint8) FuseSet {
+	f[i/32] &= ^(1 << (i % 32))
+	return f
+}
+func (f FuseSet) Has(i uint8) bool {
+	return (f[i/32] & (1 << (i % 32))) != 0
+}
+func (f FuseSet) Diff(g FuseSet) FuseSet {
+	f[0] ^= g[0]
+	f[1] ^= g[1]
+	f[2] ^= g[2]
+	f[3] ^= g[3]
+	return f
+}
+func (f FuseSet) Union(g FuseSet) FuseSet {
+	f[0] |= g[0]
+	f[1] |= g[1]
+	f[2] |= g[2]
+	f[3] |= g[3]
+	return f
+}
+func (f FuseSet) Intersection(g FuseSet) FuseSet {
+	f[0] &= g[0]
+	f[1] &= g[1]
+	f[2] &= g[2]
+	f[3] &= g[3]
+	return f
+}
+func (f FuseSet) ShiftLeft(n uint) FuseSet {
+	for n > 32 {
+		f[3] = f[2]
+		f[2] = f[1]
+		f[1] = f[0]
+		f[0] = 0
+		n -= 32
+	}
+	f[3] <<= n
+	f[3] |= (f[2] >> (32 - n))
+	f[2] <<= n
+	f[2] |= (f[1] >> (32 - n))
+	f[1] <<= n
+	f[1] |= (f[0] >> (32 - n))
+	f[0] <<= n
+	return f
+}
+func (f FuseSet) ShiftRight(n uint) FuseSet {
+	for n > 32 {
+		f[0] = f[1]
+		f[1] = f[2]
+		f[2] = f[3]
+		f[3] = 0
+		n -= 32
+	}
+	f[0] >>= n
+	f[0] |= (f[1] << (32 - n))
+	f[1] >>= n
+	f[1] |= (f[2] << (32 - n))
+	f[2] >>= n
+	f[2] |= (f[3] << (32 - n))
+	f[3] >>= n
+	return f
+}
+
 // charSet is a clever bitmask to check for ASCII char existence in a set.
 // Inspired by strings.asciiSet
 type charSet [8]uint32
@@ -83,7 +154,7 @@ func dec2int(d string) int {
 // same as matchSets[hexSet]
 const hexAlphabet = "0123456789ABCDEF"
 
-// intt2hex converts integer to fixed-length hex strings
+// int2hex converts integer to fixed-length hex strings
 // len(return) = l, prefixed with 0s
 // l must be between 0 and 7
 func int2hex(i int, l int) string {
