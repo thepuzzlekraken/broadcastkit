@@ -51,7 +51,7 @@ func (e *AWError) packResponse() string {
 	return "eR" + int2dec(int(e.No), 1) + ":" + e.Flag
 }
 func init() {
-	// The \xF7 matches any character of any length, but error may have nothing
+	// The \xF7 matches any character of 1+ length, but error may have 0
 	registerResponse(func() AWResponse { return &AWError{Flag: ""} })
 	registerResponse(func() AWResponse { return &AWError{Flag: " "} })
 }

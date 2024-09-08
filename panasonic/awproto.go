@@ -275,8 +275,7 @@ func (c *CameraRemote) strCommand(cmd string) (string, error) {
 
 // Command sends the passed AWRequest to the camera
 //
-// AW protocol error responses are not considered errors. Check AWResponse.Ok()
-// to know if the Request was accepted.
+// AW protocol error responses are returned as errors, not AWResponse objects.
 func (c *CameraRemote) Command(req AWRequest) (AWResponse, error) {
 	cmd := req.packRequest()
 
@@ -286,15 +285,19 @@ func (c *CameraRemote) Command(req AWRequest) (AWResponse, error) {
 	}
 
 	res := req.Response()
-	sig := res.responseSignature()
-	if match(sig, ret) {
-		res.unpackResponse(ret)
-		return res, nil
+	if sig := res.responseSignature(); !match(sig, ret) {
+		res = newResponse(ret)
 	}
 
-	return newResponse(ret), nil
+	res.unpackResponse(ret)
+
+	if err, ok := res.(*AWError); ok {
+		return nil, err
+	}
+	return res, nil
 }
 
+// BatchInformation returns the command responses available at the camdata page.
 func (c *CameraRemote) BatchInformation() ([]AWResponse, error) {
 	data, err := c.httpGet("/live/camdata.html", "")
 	if err != nil {
