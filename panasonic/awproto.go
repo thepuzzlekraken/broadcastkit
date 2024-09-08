@@ -23,11 +23,6 @@ const networkTimeout = 3 * time.Second
 // further information, the application has to type-assert the response to the
 // specific implementation.
 type AWResponse interface {
-	// Ok returns whether this response represents an error condition.
-	//
-	// The return value follows the Panasonic behavior, which is rarely useful
-	// beyond the basic check for command acceptance.
-	Ok() bool
 	// responseSignature returns the pattern of Panasonic string literals.
 	//
 	// Pattern is in a custom format of this package. The match() function
@@ -89,9 +84,6 @@ type AWUnknownResponse struct {
 	text string
 }
 
-func (a *AWUnknownResponse) Ok() bool {
-	return false
-}
 func (a *AWUnknownResponse) responseSignature() string {
 	return a.text
 }

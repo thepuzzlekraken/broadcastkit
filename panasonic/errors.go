@@ -34,9 +34,6 @@ func (e *AWError) Error() string {
 	}
 }
 
-func (e *AWError) Ok() bool {
-	return false
-}
 func (e *AWError) responseSignature() string {
 	sig := "\x03R\x01:\xF7"
 	// return the correct-length pattern depending on flag length
@@ -76,7 +73,7 @@ type SystemError struct {
 }
 
 func (e *SystemError) Error() string {
-	return fmt.Sprintf("panasonic network failure: %s", e.parent.Error())
+	return fmt.Sprintf("panasonic system failure: %s", e.parent.Error())
 }
 func (e *SystemError) Unwrap() error {
 	return e.parent

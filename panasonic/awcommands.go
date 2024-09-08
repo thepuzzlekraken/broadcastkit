@@ -58,9 +58,7 @@ func (a *AWPower) packRequest() string {
 	}
 	return "#O" + string(c)
 }
-func (a *AWPower) Ok() bool {
-	return true
-}
+
 func (a *AWPower) responseSignature() string {
 	return "p\x00"
 }
@@ -132,9 +130,7 @@ func (a *AWInstall) unpackRequest(cmd string) {
 func (a *AWInstall) packRequest() string {
 	return "#INS" + int2dec(int(a.Position), 1)
 }
-func (a *AWInstall) Ok() bool {
-	return true
-}
+
 func (a *AWInstall) responseSignature() string {
 	return "iNS\x02"
 }
@@ -211,9 +207,7 @@ func (a *AWPanTiltTo) unpackRequest(cmd string) {
 func (a *AWPanTiltTo) packRequest() string {
 	return "#APC" + a.Pan.toWire() + a.Tilt.toWire()
 }
-func (a *AWPanTiltTo) Ok() bool {
-	return true
-}
+
 func (a *AWPanTiltTo) responseSignature() string {
 	// #APC not supported in awNty notifications unfortunately
 	return "aPC\x01\x01\x01\x01\x01\x01\x01\x01"
@@ -333,9 +327,7 @@ func (a *AWPanTiltSpeedTo) unpackRequest(cmd string) {
 func (a *AWPanTiltSpeedTo) packRequest() string {
 	return "#APS" + a.Pan.toWire() + a.Tilt.toWire() + a.Speed.toWire()
 }
-func (a *AWPanTiltSpeedTo) Ok() bool {
-	return true
-}
+
 func (a *AWPanTiltSpeedTo) responseSignature() string {
 	// #APS not supported in awNty notifications unfortunately
 	return "aPS\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x02"
@@ -376,9 +368,7 @@ func (a *AWPanTiltBy) unpackRequest(cmd string) {
 func (a *AWPanTiltBy) packRequest() string {
 	return "#RPC" + a.Pan.toWire() + a.Tilt.toWire()
 }
-func (a *AWPanTiltBy) Ok() bool {
-	return true
-}
+
 func (a *AWPanTiltBy) responseSignature() string {
 	// #RPC not supported in awNty notifications unfortunately
 	return "rPC\x01\x01\x01\x01\x01\x01\x01\x01"
@@ -420,9 +410,7 @@ func (a *AWPanTiltSpeedBy) unpackRequest(cmd string) {
 func (a *AWPanTiltSpeedBy) packRequest() string {
 	return "#RPS" + a.Pan.toWire() + a.Tilt.toWire() + a.Speed.toWire()
 }
-func (a *AWPanTiltSpeedBy) Ok() bool {
-	return true
-}
+
 func (a *AWPanTiltSpeedBy) responseSignature() string {
 	// #RPS not supported in awNty notifications
 	return "rPS\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x02"
@@ -487,9 +475,7 @@ func (a *AWPan) unpackRequest(cmd string) {
 func (a *AWPan) packRequest() string {
 	return "#P" + a.Pan.toWire()
 }
-func (a *AWPan) Ok() bool {
-	return true
-}
+
 func (a *AWPan) responseSignature() string {
 	return "pS\x02\x02"
 }
@@ -524,9 +510,7 @@ func (a *AWTilt) unpackRequest(cmd string) {
 func (a *AWTilt) packRequest() string {
 	return "#T" + a.Tilt.toWire()
 }
-func (a *AWTilt) Ok() bool {
-	return true
-}
+
 func (a *AWTilt) responseSignature() string {
 	return "tS\x02\x02"
 }
@@ -565,9 +549,7 @@ func (a *AWPanTilt) unpackRequest(cmd string) {
 func (a *AWPanTilt) packRequest() string {
 	return "#PTS" + a.Pan.toWire() + a.Tilt.toWire()
 }
-func (a *AWPanTilt) Ok() bool {
-	return true
-}
+
 func (a *AWPanTilt) responseSignature() string {
 	return "pTS\x02\x02\x02\x02"
 }
@@ -613,9 +595,7 @@ type AWZoomTo struct {
 
 func init() { registerRequest(func() AWRequest { return &AWZoomTo{} }) }
 func init() { registerResponse(func() AWResponse { return &AWZoomTo{} }) }
-func (a *AWZoomTo) Ok() bool {
-	return true
-}
+
 func (a *AWZoomTo) Acceptable() bool {
 	return a.Zoom.Acceptable()
 }
@@ -668,9 +648,7 @@ type AWZoomResponseAlternate struct {
 }
 
 func init() { registerResponse(func() AWResponse { return &AWZoomResponseAlternate{} }) }
-func (a *AWZoomResponseAlternate) Ok() bool {
-	return true
-}
+
 func (a *AWZoomResponseAlternate) responseSignature() string {
 	// There's a special case of gz--- which is returned instead of an eR2 error
 	// when the camera is suspended. We'll just let that for UnknownResponse.
@@ -727,9 +705,7 @@ func (a *AWZoom) unpackRequest(cmd string) {
 func (a *AWZoom) packRequest() string {
 	return "#Z" + a.Zoom.toWire()
 }
-func (a *AWZoom) Ok() bool {
-	return true
-}
+
 func (a *AWZoom) responseSignature() string {
 	return "zS\x02\x02"
 }
@@ -747,9 +723,7 @@ type AWFocusTo struct {
 
 func init() { registerRequest(func() AWRequest { return &AWFocusTo{} }) }
 func init() { registerResponse(func() AWResponse { return &AWFocusTo{} }) }
-func (a *AWFocusTo) Ok() bool {
-	return true
-}
+
 func (a *AWFocusTo) Acceptable() bool {
 	return a.Focus.Acceptable()
 }
@@ -799,9 +773,7 @@ type AWFocusResponseAlternate struct {
 }
 
 func init() { registerResponse(func() AWResponse { return &AWFocusResponseAlternate{} }) }
-func (a *AWFocusResponseAlternate) Ok() bool {
-	return true
-}
+
 func (a *AWFocusResponseAlternate) responseSignature() string {
 	// There's a special case of gz--- which is returned instead of an eR2 error
 	// when the camera is suspended. We'll just leave that for UnknownResponse.
@@ -848,9 +820,7 @@ func (a *AWFocus) Acceptable() bool {
 func (a *AWFocus) Response() AWResponse {
 	return a
 }
-func (a *AWFocus) Ok() bool {
-	return true
-}
+
 func (a *AWFocus) requestSignature() string {
 	return "#F\x02\x02"
 }
@@ -883,9 +853,7 @@ func (a *AWAutoFocus) Acceptable() bool {
 func (a *AWAutoFocus) Response() AWResponse {
 	return a
 }
-func (a *AWAutoFocus) Ok() bool {
-	return true
-}
+
 func (a *AWAutoFocus) requestSignature() string {
 	return "#D1\x02"
 }
@@ -936,9 +904,7 @@ func (a *AWIrisTo) Acceptable() bool {
 func (a *AWIrisTo) Response() AWResponse {
 	return a
 }
-func (a *AWIrisTo) Ok() bool {
-	return true
-}
+
 func (a *AWIrisTo) requestSignature() string {
 	return "#AXI\x01\x01\x01"
 }
@@ -1015,9 +981,7 @@ func (a *AWIris) Acceptable() bool {
 func (a *AWIris) Response() AWResponse {
 	return a
 }
-func (a *AWIris) Ok() bool {
-	return true
-}
+
 func (a *AWIris) requestSignature() string {
 	return "#I\x02\x02"
 }
@@ -1050,9 +1014,7 @@ func (a *AWAutoIris) Acceptable() bool {
 func (a *AWAutoIris) Response() AWResponse {
 	return a
 }
-func (a *AWAutoIris) Ok() bool {
-	return true
-}
+
 func (a *AWAutoIris) requestSignature() string {
 	return "#D3\x02"
 }
@@ -1115,9 +1077,7 @@ type AWCombinedIrisInfo struct {
 }
 
 func init() { registerResponse(func() AWResponse { return &AWCombinedIrisInfo{} }) }
-func (a *AWCombinedIrisInfo) Ok() bool {
-	return true
-}
+
 func (a *AWCombinedIrisInfo) responseSignature() string {
 	// The --- as iris position is a "busy error". It will be left for Unknown
 	// response in this case.
@@ -1158,9 +1118,7 @@ type AWPreset struct {
 }
 
 func init() { registerResponse(func() AWResponse { return &AWPreset{} }) }
-func (a *AWPreset) Ok() bool {
-	return true
-}
+
 func (a *AWPreset) responseSignature() string {
 	return "s\x02\x02"
 }
@@ -1317,9 +1275,7 @@ func (a *AWPresetSpeed) Acceptable() bool {
 func (a *AWPresetSpeed) Response() AWResponse {
 	return a
 }
-func (a *AWPresetSpeed) Ok() bool {
-	return true
-}
+
 func (a *AWPresetSpeed) requestSignature() string {
 	return "#UPVS\x02\x02\x02"
 }
@@ -1370,9 +1326,7 @@ func (a *AWPresetFreeze) Acceptable() bool {
 func (a *AWPresetFreeze) Response() AWResponse {
 	return a
 }
-func (a *AWPresetFreeze) Ok() bool {
-	return true
-}
+
 func (a *AWPresetFreeze) requestSignature() string {
 	return "#PRF\x02"
 }
@@ -1422,9 +1376,7 @@ func (a *AWPresetSpeedTable) Acceptable() bool {
 func (a *AWPresetSpeedTable) Response() AWResponse {
 	return a
 }
-func (a *AWPresetSpeedTable) Ok() bool {
-	return true
-}
+
 func (a *AWPresetSpeedTable) requestSignature() string {
 	return "#PST\x02"
 }
@@ -1472,9 +1424,7 @@ type AWPresetEntries struct {
 }
 
 func init() { registerResponse(func() AWResponse { return &AWPresetEntries{} }) }
-func (a *AWPresetEntries) Ok() bool {
-	return true
-}
+
 func (a *AWPresetEntries) responseSignature() string {
 	return "pE\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01"
 }
@@ -1565,9 +1515,7 @@ type AWPresetPlayback struct {
 }
 
 func init() { registerResponse(func() AWResponse { return &AWPresetPlayback{} }) }
-func (a *AWPresetPlayback) Ok() bool {
-	return true
-}
+
 func (a *AWPresetPlayback) responseSignature() string {
 	return "q\x02\x02"
 }
@@ -1595,9 +1543,7 @@ func (a *AWTallyEnable) Acceptable() bool {
 func (a *AWTallyEnable) Response() AWResponse {
 	return a
 }
-func (a *AWTallyEnable) Ok() bool {
-	return true
-}
+
 func (a *AWTallyEnable) requestSignature() string {
 	return "#TAE\x02"
 }
@@ -1648,9 +1594,7 @@ func (a *AWTallySet) Acceptable() bool {
 func (a *AWTallySet) Response() AWResponse {
 	return a
 }
-func (a *AWTallySet) Ok() bool {
-	return true
-}
+
 func (a *AWTallySet) requestSignature() string {
 	return "#DA\x02"
 }
@@ -1701,9 +1645,7 @@ func (a *AWWirelessRemote) Acceptable() bool {
 func (a *AWWirelessRemote) Response() AWResponse {
 	return a
 }
-func (a *AWWirelessRemote) Ok() bool {
-	return true
-}
+
 func (a *AWWirelessRemote) requestSignature() string {
 	return "#WLC\x02"
 }
@@ -1776,9 +1718,7 @@ func (a *AWWirelessRemoteID) Acceptable() bool {
 func (a *AWWirelessRemoteID) Response() AWResponse {
 	return a
 }
-func (a *AWWirelessRemoteID) Ok() bool {
-	return true
-}
+
 func (a *AWWirelessRemoteID) requestSignature() string {
 	return "#RID\x02"
 }
@@ -1829,9 +1769,7 @@ func (a *AWSpeedWithZoom) Acceptable() bool {
 func (a *AWSpeedWithZoom) Response() AWResponse {
 	return a
 }
-func (a *AWSpeedWithZoom) Ok() bool {
-	return true
-}
+
 func (a *AWSpeedWithZoom) requestSignature() string {
 	return "#SWZ\x02"
 }
@@ -1899,11 +1837,6 @@ type AWHealthStatus struct {
 
 func init() { registerResponse(func() AWResponse { return &AWHealthStatus{} }) }
 
-// OK indicates that this is a successful response. This does not mean that the
-// camera is healthy! See HealthCode.Problem() to check that.
-func (a *AWHealthStatus) Ok() bool {
-	return true
-}
 func (a *AWHealthStatus) responseSignature() string {
 	return "rER\x01\x01"
 }
@@ -1944,9 +1877,7 @@ func (a *AWOptionSwitch) Acceptable() bool {
 func (a *AWOptionSwitch) Response() AWResponse {
 	return a
 }
-func (a *AWOptionSwitch) Ok() bool {
-	return true
-}
+
 func (a *AWOptionSwitch) requestSignature() string {
 	return "#D6\x02"
 }
@@ -2018,9 +1949,7 @@ type AWLensInformation struct {
 }
 
 func init() { registerResponse(func() AWResponse { return &AWLensInformation{} }) }
-func (a *AWLensInformation) Ok() bool {
-	return true
-}
+
 func (a *AWLensInformation) responseSignature() string {
 	return "lPI\x01\x01\x01\x01\x01\x01\x01\x01\x01"
 }
@@ -2064,9 +1993,7 @@ func (a *AWLensInformationNotify) Acceptable() bool {
 func (a *AWLensInformationNotify) Response() AWResponse {
 	return a
 }
-func (a *AWLensInformationNotify) Ok() bool {
-	return true
-}
+
 func (a *AWLensInformationNotify) requestSignature() string {
 	return "#LPC\x02"
 }
@@ -2119,9 +2046,7 @@ type AWSoftwareVersion struct {
 }
 
 func init() { registerResponse(func() AWResponse { return &AWSoftwareVersion{} }) }
-func (a *AWSoftwareVersion) Ok() bool {
-	return true
-}
+
 func (a *AWSoftwareVersion) responseSignature() string {
 	return "qSV\x02V\x02\x02.\x02\x02\x00\x02\x02\x02"
 }
@@ -2180,9 +2105,7 @@ func (a *AWAutoFocusAlternate) Acceptable() bool {
 func (a *AWAutoFocusAlternate) Response() AWResponse {
 	return a
 }
-func (a *AWAutoFocusAlternate) Ok() bool {
-	return true
-}
+
 func (a *AWAutoFocusAlternate) requestSignature() string {
 	return "OAF:\x02"
 }
@@ -2243,9 +2166,7 @@ func (a *AWOneTouchFocus) unpackRequest(cmd string) {
 func (a *AWOneTouchFocus) packRequest() string {
 	return "OSE:69:" + int2dec(a.Parameter+1, 1)
 }
-func (a *AWOneTouchFocus) Ok() bool {
-	return true
-}
+
 func (a *AWOneTouchFocus) responseSignature() string {
 	return a.requestSignature()
 }
@@ -2268,9 +2189,7 @@ func (a *AWAutoIrisAlternate) Acceptable() bool {
 func (a *AWAutoIrisAlternate) Response() AWResponse {
 	return a
 }
-func (a *AWAutoIrisAlternate) Ok() bool {
-	return true
-}
+
 func (a *AWAutoIrisAlternate) requestSignature() string {
 	return "ORS:\x02"
 }
@@ -2323,9 +2242,7 @@ func (a *AWIrisAlternate) Acceptable() bool {
 func (a *AWIrisAlternate) Response() AWResponse {
 	return a
 }
-func (a *AWIrisAlternate) Ok() bool {
-	return true
-}
+
 func (a *AWIrisAlternate) requestSignature() string {
 	return "ORV:\x01\x01\x01"
 }
@@ -2378,9 +2295,7 @@ func (a *AWIrisAlternate2) Acceptable() bool {
 func (a *AWIrisAlternate2) Response() AWResponse {
 	return a
 }
-func (a *AWIrisAlternate2) Ok() bool {
-	return true
-}
+
 func (a *AWIrisAlternate2) requestSignature() string {
 	return "OSD:4F:\x01\x01"
 }
@@ -2451,9 +2366,7 @@ func (a *AWNDFilter) Acceptable() bool {
 func (a *AWNDFilter) Response() AWResponse {
 	return a
 }
-func (a *AWNDFilter) Ok() bool {
-	return true
-}
+
 func (a *AWNDFilter) requestSignature() string {
 	return "OFT:\x02"
 }
@@ -2519,9 +2432,7 @@ func (a *AWContrastLevel) Acceptable() bool {
 func (a *AWContrastLevel) Response() AWResponse {
 	return a
 }
-func (a *AWContrastLevel) Ok() bool {
-	return true
-}
+
 func (a *AWContrastLevel) requestSignature() string {
 	return "OSD:48:\x01\x01"
 }
@@ -2574,9 +2485,7 @@ func (a *AWLensInformationAlternate) Acceptable() bool {
 func (a *AWLensInformationAlternate) Response() AWResponse {
 	return a
 }
-func (a *AWLensInformationAlternate) Ok() bool {
-	return true
-}
+
 func (a *AWLensInformationAlternate) responseSignature() string {
 	return "OSI:18:\x01\x01\x01:\x01\x01\x01:\x01\x01\x01"
 }
@@ -2631,9 +2540,7 @@ func (a *AWOSDMenu) unpackRequest(cmd string) {
 func (a *AWOSDMenu) packRequest() string {
 	return "DUS:" + a.Display.toWire()
 }
-func (a *AWOSDMenu) Ok() bool {
-	return true
-}
+
 func (a *AWOSDMenu) responseSignature() string {
 	return a.requestSignature()
 }
@@ -2668,9 +2575,7 @@ type AWTitle struct {
 
 func init() { registerResponse(func() AWResponse { return &AWTitle{} }) }
 func init() { registerResponse(func() AWResponse { return &AWTitle{Title: " "} }) }
-func (a *AWTitle) Ok() bool {
-	return true
-}
+
 func (a *AWTitle) responseSignature() string {
 	return "TITLE:\xF7"[:min(len(a.Title)+6, 7)]
 }
