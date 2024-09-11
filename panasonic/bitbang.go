@@ -36,6 +36,13 @@ func (f FuseSet) Intersection(g FuseSet) FuseSet {
 	f[3] &= g[3]
 	return f
 }
+func (f FuseSet) Invert() FuseSet {
+	f[0] = ^f[0]
+	f[1] = ^f[1]
+	f[2] = ^f[2]
+	f[3] = ^f[3]
+	return f
+}
 func (f FuseSet) ShiftLeft(n uint) FuseSet {
 	for n > 32 {
 		f[3] = f[2]

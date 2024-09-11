@@ -1844,7 +1844,7 @@ func (a *AWHealthStatus) unpackResponse(cmd string) {
 	a.Code = toHealthCode(cmd[3:5])
 }
 func (a *AWHealthStatus) packResponse() string {
-	return "rER\x01\x01" + a.Code.toWire()
+	return "rER" + a.Code.toWire()
 }
 
 type AWHealthQuery struct{}

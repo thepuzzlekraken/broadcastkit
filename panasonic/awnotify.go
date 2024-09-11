@@ -2,7 +2,6 @@ package panasonic
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -384,28 +383,4 @@ func (s *NotifySession) Send(res AWResponse) error {
 		time.Sleep(100 * time.Millisecond)
 	}
 	return &SystemError{err}
-}
-
-// NotifyForward is a blocking function that forwards notifications.
-//
-// NotifyForward returns only when an irrecoverable error occurs, such as the
-// src listener is closed. If there are no messages received for the duration of
-// the timeout, Start will be called automatically on the src listener. There
-// is no limit on the number of retries.
-func NotifyForward(src *NotifyListener, dst *NotifyServer, timeout time.Duration) error {
-	for {
-		src.SetDeadline(time.Now().Add(timeout))
-		b, err := src.Accept()
-		if err != nil {
-			var oerr *net.OpError
-			if !errors.As(err, oerr) || !oerr.Timeout() {
-				return err
-			}
-			rerr := src.Start()
-			if rerr != nil {
-				return rerr
-			}
-		}
-		dst.SendAll(b)
-	}
 }

@@ -322,7 +322,7 @@ func (c *CameraServer) serveCamData(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "Bad Gateway", http.StatusBadGateway)
 	}
-	w.Header().Add("Content-Type", "text/html")
+	w.Header().Add("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
 	for _, r := range b {
 		w.Write([]byte(r.packResponse()))

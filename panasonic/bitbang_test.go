@@ -585,3 +585,45 @@ func TestFuseSet_ShiftRight(t *testing.T) {
 		})
 	}
 }
+func TestFuseSet_Invert(t *testing.T) {
+	tests := []struct {
+		name     string
+		initial  FuseSet
+		expected FuseSet
+	}{
+		{
+			name:     "Invert all zeros",
+			initial:  FuseSet{0x00000000, 0x00000000, 0x00000000, 0x00000000},
+			expected: FuseSet{0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
+		},
+		{
+			name:     "Invert all ones",
+			initial:  FuseSet{0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
+			expected: FuseSet{0x00000000, 0x00000000, 0x00000000, 0x00000000},
+		},
+		{
+			name:     "Invert alternating bits",
+			initial:  FuseSet{0xAAAAAAAA, 0xAAAAAAAA, 0xAAAAAAAA, 0xAAAAAAAA},
+			expected: FuseSet{0x55555555, 0x55555555, 0x55555555, 0x55555555},
+		},
+		{
+			name:     "Invert mixed values",
+			initial:  FuseSet{0x12345678, 0x9ABCDEF0, 0xFEDCBA98, 0x76543210},
+			expected: FuseSet{0xEDCBA987, 0x6543210F, 0x01234567, 0x89ABCDEF},
+		},
+		{
+			name:     "Invert other pattern",
+			initial:  FuseSet{0xFFFFFFFF, 0x00000000, 0xFFFFFFFF, 0x00000000},
+			expected: FuseSet{0x00000000, 0xFFFFFFFF, 0x00000000, 0xFFFFFFFF},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.initial.Invert()
+			if result != tt.expected {
+				t.Errorf("FuseSet.Invert() = %v; want %v", result, tt.expected)
+			}
+		})
+	}
+}
