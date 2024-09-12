@@ -227,7 +227,7 @@ func match(pattern string, s string) bool {
 		if c >= 32 {
 			// exact match
 			if c != s[p] {
-				return c == '\xF7' // magic stop char check
+				return c == '\x7F' // magic stop char check
 			}
 			continue
 		}

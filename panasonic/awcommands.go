@@ -1471,10 +1471,10 @@ func (a *AWPresetEntries) packResponse() string {
 //
 // This function helps to determine the bits valid inside an AWPresetEntries
 func (o FuseOffset) Mask() FuseSet {
-	if o < 0 {
+	if o < 0 || o > 3 {
 		return FuseSet{0x0, 0x0, 0x0, 0x0}
 	}
-	return FuseSet{0xFFFFFFFF, 0xFF, 0x0, 0x0}.ShiftLeft(uint(o * 10))
+	return FuseSet{0xFFFFFFFF, 0xFF, 0x0, 0x0}.ShiftLeft(uint(o * 40))
 }
 
 // Offset returns the Offset capable of representing this Preset.

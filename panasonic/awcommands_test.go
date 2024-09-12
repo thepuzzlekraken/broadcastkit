@@ -154,7 +154,7 @@ func TestFuseOffset_Mask(t *testing.T) {
 		{
 			name:     "Large Offset",
 			offset:   10,
-			expected: FuseSet{0xFF, 0xC0000000, 0x0, 0x0},
+			expected: FuseSet{0x0, 0x0, 0x0, 0x0},
 		},
 	}
 
@@ -162,7 +162,7 @@ func TestFuseOffset_Mask(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := tt.offset.Mask()
 			if !reflect.DeepEqual(result, tt.expected) {
-				t.Errorf("PresetMaskFor(%d) = %v, want %v", tt.offset, result, tt.expected)
+				t.Errorf("Offset(%d).Mask() = %x, want %x", tt.offset, result, tt.expected)
 			}
 		})
 	}
