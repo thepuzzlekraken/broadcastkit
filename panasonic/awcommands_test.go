@@ -15,32 +15,32 @@ func TestAWPresetEntriesUnpackResponse(t *testing.T) {
 			name: "Offset 0",
 			cmd:  "pE008000000001",
 			expected: AWPresetEntries{
-				Offset:  0,
-				Entries: FuseSet{}.Set(0).Set(39),
+				Offset: 0,
+				Bits:   Bits64(0).Set(0).Set(39),
 			},
 		},
 		{
 			name: "Offset 1",
-			cmd:  "pE018000000001",
+			cmd:  "pE018000000010",
 			expected: AWPresetEntries{
-				Offset:  1,
-				Entries: FuseSet{}.Set(40).Set(79),
+				Offset: 1,
+				Bits:   Bits64(0).Set(4).Set(39),
 			},
 		},
 		{
 			name: "Offset 2",
-			cmd:  "pE020000080001",
+			cmd:  "pE020000080100",
 			expected: AWPresetEntries{
-				Offset:  2,
-				Entries: FuseSet{}.Set(80).Set(99),
+				Offset: 2,
+				Bits:   Bits64(0).Set(8).Set(19),
 			},
 		},
 		{
 			name: "All Ones",
 			cmd:  "pE00FFFFFFFFFF",
 			expected: AWPresetEntries{
-				Offset:  0,
-				Entries: FuseSet{0xFFFFFFFF, 0xFF, 0x0, 0x0},
+				Offset: 0,
+				Bits:   Bits64(0xFFFFFFFFFF),
 			},
 		},
 	}
@@ -64,48 +64,48 @@ func TestAWPresetEntriesPackResponse(t *testing.T) {
 		{
 			name: "Offset 0 with some entries",
 			input: AWPresetEntries{
-				Offset:  0,
-				Entries: FuseSet{}.Set(0).Set(5).Set(10),
+				Offset: 0,
+				Bits:   Bits64(0).Set(0).Set(5).Set(10),
 			},
 			expected: "pE000000000421",
 		},
 		{
 			name: "Offset 1 with some entries",
 			input: AWPresetEntries{
-				Offset:  1,
-				Entries: FuseSet{}.Set(40).Set(45).Set(50),
+				Offset: 1,
+				Bits:   Bits64(0).Set(0).Set(5).Set(10).Set(39),
 			},
-			expected: "pE010000000421",
+			expected: "pE018000000421",
 		},
 		{
 			name: "Offset 2 with some entries",
 			input: AWPresetEntries{
-				Offset:  2,
-				Entries: FuseSet{}.Set(80).Set(85).Set(90),
+				Offset: 2,
+				Bits:   Bits64(0).Set(0).Set(5).Set(10),
 			},
 			expected: "pE020000000421",
 		},
 		{
 			name: "Invalid negative offset",
 			input: AWPresetEntries{
-				Offset:  -1,
-				Entries: FuseSet{},
+				Offset: -1,
+				Bits:   Bits64(0),
 			},
 			expected: "pEFF0000000000",
 		},
 		{
 			name: "Empty entries",
 			input: AWPresetEntries{
-				Offset:  0,
-				Entries: FuseSet{},
+				Offset: 0,
+				Bits:   Bits64(0),
 			},
 			expected: "pE000000000000",
 		},
 		{
 			name: "All entries set",
 			input: AWPresetEntries{
-				Offset:  0,
-				Entries: FuseSet{0xFFFFFFFF, 0xFF, 0x0, 0x0},
+				Offset: 0,
+				Bits:   Bits64(0xFFFFFFFFFF),
 			},
 			expected: "pE00FFFFFFFFFF",
 		},
@@ -123,38 +123,38 @@ func TestAWPresetEntriesPackResponse(t *testing.T) {
 func TestFuseOffset_Mask(t *testing.T) {
 	tests := []struct {
 		name     string
-		offset   FuseOffset
-		expected FuseSet
+		offset   Offset
+		expected Bits128
 	}{
 		{
 			name:     "Offset 0",
 			offset:   0,
-			expected: FuseSet{0xFFFFFFFF, 0xFF, 0x0, 0x0},
+			expected: Bits128{0xFFFFFFFFFF, 0x0},
 		},
 		{
 			name:     "Offset 1",
 			offset:   1,
-			expected: FuseSet{0x0, 0xFFFFFF00, 0xFFFF, 0x0},
+			expected: Bits128{0xFFFFFF0000000000, 0xFFFF},
 		},
 		{
 			name:     "Offset 2",
 			offset:   2,
-			expected: FuseSet{0x0, 0x0, 0xFFFF0000, 0xFFFFFF},
+			expected: Bits128{0x0, 0xFFFFFFFFFF0000},
 		},
 		{
 			name:     "Offset 3",
 			offset:   3,
-			expected: FuseSet{0x0, 0x0, 0x0, 0xFF000000},
+			expected: Bits128{0x0, 0xFF00000000000000},
 		},
 		{
 			name:     "Negative Offset",
 			offset:   -1,
-			expected: FuseSet{0x0, 0x0, 0x0, 0x0},
+			expected: Bits128{0x0, 0x0},
 		},
 		{
 			name:     "Large Offset",
 			offset:   10,
-			expected: FuseSet{0x0, 0x0, 0x0, 0x0},
+			expected: Bits128{0x0, 0x0},
 		},
 	}
 

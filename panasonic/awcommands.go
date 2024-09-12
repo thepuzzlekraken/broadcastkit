@@ -287,14 +287,14 @@ func (s SpeedUnit) Acceptable() bool {
 func (s SpeedUnit) toWire() string {
 	sp := s.Speed
 	if sp == 0 {
-		sp = 9
+		sp = 10
 	}
-	return int2hex(sp, 2) + s.Table.toWire()
+	return int2hex(sp-1, 2) + s.Table.toWire()
 }
 func toSpeedUnit(data string) SpeedUnit {
 	_ = data[2]
 	return SpeedUnit{
-		Speed: int(hex2int(data[0:2])),
+		Speed: int(hex2int(data[0:2]) + 1),
 		Table: toSpeedTable(data[2:3]),
 	}
 }
@@ -1396,16 +1396,16 @@ func (a *AWPresetSpeedTable) packResponse() string {
 	return "pST" + a.Table.toWire()
 }
 
-type FuseOffset int
+type Offset int
 
-func (f FuseOffset) Acceptable() bool {
+func (f Offset) Acceptable() bool {
 	return f >= 0 && f <= 2
 }
-func (f FuseOffset) toWire() string {
+func (f Offset) toWire() string {
 	return int2hex(int(f), 2)
 }
-func toFuseOffset(data string) FuseOffset {
-	return FuseOffset(hex2int(data[0:2]))
+func toOffset(data string) Offset {
+	return Offset(hex2int(data[0:2]))
 }
 
 // AWPresetEntries returns a bitmask of the stored presets.
@@ -1416,11 +1416,10 @@ func toFuseOffset(data string) FuseOffset {
 // offset(0) -> preset 0-39
 // offset(1) -> preset 40-79
 // offset(2) -> preset 80-119 (unused above 99)
-// The Entries field is always a full bitmask, with non-representative bits
-// set to 0 when received. Non-represnetative bits are ignored when sending.
+// You can use the Apply and Mask helper functions on Offset to process the Bits
 type AWPresetEntries struct {
-	Offset  FuseOffset
-	Entries FuseSet
+	Bits   Bits64
+	Offset Offset
 }
 
 func init() { registerResponse(func() AWResponse { return &AWPresetEntries{} }) }
@@ -1430,19 +1429,19 @@ func (a *AWPresetEntries) responseSignature() string {
 }
 func (a *AWPresetEntries) unpackResponse(cmd string) {
 	_ = cmd[13]
-	a.Offset = toFuseOffset(cmd[2:4])
-	f := FuseSet{}
-	f[1] |= uint32(strings.IndexByte(hexAlphabet, cmd[4])&0xF) << 4
-	f[1] |= uint32(strings.IndexByte(hexAlphabet, cmd[5])&0xF) << 0
-	f[0] |= uint32(strings.IndexByte(hexAlphabet, cmd[6])&0xF) << 28
-	f[0] |= uint32(strings.IndexByte(hexAlphabet, cmd[7])&0xF) << 24
-	f[0] |= uint32(strings.IndexByte(hexAlphabet, cmd[8])&0xF) << 20
-	f[0] |= uint32(strings.IndexByte(hexAlphabet, cmd[9])&0xF) << 16
-	f[0] |= uint32(strings.IndexByte(hexAlphabet, cmd[10])&0xF) << 12
-	f[0] |= uint32(strings.IndexByte(hexAlphabet, cmd[11])&0xF) << 8
-	f[0] |= uint32(strings.IndexByte(hexAlphabet, cmd[12])&0xF) << 4
-	f[0] |= uint32(strings.IndexByte(hexAlphabet, cmd[13])&0xF) << 0
-	a.Entries = f.ShiftLeft(uint(40 * a.Offset))
+	a.Offset = toOffset(cmd[2:4])
+	var b Bits64
+	b |= Bits64(strings.IndexByte(hexAlphabet, cmd[4]) & 0xF).ShiftLeft(36)
+	b |= Bits64(strings.IndexByte(hexAlphabet, cmd[5]) & 0xF).ShiftLeft(32)
+	b |= Bits64(strings.IndexByte(hexAlphabet, cmd[6]) & 0xF).ShiftLeft(28)
+	b |= Bits64(strings.IndexByte(hexAlphabet, cmd[7]) & 0xF).ShiftLeft(24)
+	b |= Bits64(strings.IndexByte(hexAlphabet, cmd[8]) & 0xF).ShiftLeft(20)
+	b |= Bits64(strings.IndexByte(hexAlphabet, cmd[9]) & 0xF).ShiftLeft(16)
+	b |= Bits64(strings.IndexByte(hexAlphabet, cmd[10]) & 0xF).ShiftLeft(12)
+	b |= Bits64(strings.IndexByte(hexAlphabet, cmd[11]) & 0xF).ShiftLeft(8)
+	b |= Bits64(strings.IndexByte(hexAlphabet, cmd[12]) & 0xF).ShiftLeft(4)
+	b |= Bits64(strings.IndexByte(hexAlphabet, cmd[13]) & 0xF).ShiftLeft(0)
+	a.Bits = b
 }
 func (a *AWPresetEntries) packResponse() string {
 	o := a.Offset
@@ -1453,39 +1452,55 @@ func (a *AWPresetEntries) packResponse() string {
 	s := make([]byte, 14)
 	copy(s, "pE")
 	copy(s[2:], o.toWire())
-	f := a.Entries.ShiftRight(uint(40 * a.Offset))
-	s[4] = hexAlphabet[(f[1]>>4)&0xF]
-	s[5] = hexAlphabet[(f[1]>>0)&0xF]
-	s[6] = hexAlphabet[(f[0]>>28)&0xF]
-	s[7] = hexAlphabet[(f[0]>>24)&0xF]
-	s[8] = hexAlphabet[(f[0]>>20)&0xF]
-	s[9] = hexAlphabet[(f[0]>>16)&0xF]
-	s[10] = hexAlphabet[(f[0]>>12)&0xF]
-	s[11] = hexAlphabet[(f[0]>>8)&0xF]
-	s[12] = hexAlphabet[(f[0]>>4)&0xF]
-	s[13] = hexAlphabet[(f[0]>>0)&0xF]
+	b := a.Bits
+	s[4] = hexAlphabet[(b>>36)&0xF]
+	s[5] = hexAlphabet[(b>>32)&0xF]
+	s[6] = hexAlphabet[(b>>28)&0xF]
+	s[7] = hexAlphabet[(b>>24)&0xF]
+	s[8] = hexAlphabet[(b>>20)&0xF]
+	s[9] = hexAlphabet[(b>>16)&0xF]
+	s[10] = hexAlphabet[(b>>12)&0xF]
+	s[11] = hexAlphabet[(b>>8)&0xF]
+	s[12] = hexAlphabet[(b>>4)&0xF]
+	s[13] = hexAlphabet[(b>>0)&0xF]
 	return string(s)
 }
 
-// Mask returns a bitmask of the bits valid on the given preset offset.
+// Mask returns a bitmask of the bits represented on the given preset offset.
 //
 // This function helps to determine the bits valid inside an AWPresetEntries
-func (o FuseOffset) Mask() FuseSet {
+func (o Offset) Mask() Bits128 {
 	if o < 0 || o > 3 {
-		return FuseSet{0x0, 0x0, 0x0, 0x0}
+		return Bits128{0x0, 0x0}
 	}
-	return FuseSet{0xFFFFFFFF, 0xFF, 0x0, 0x0}.ShiftLeft(uint(o * 40))
+	return Bits128{0xFFFFFFFFFF, 0x0}.ShiftLeft(uint8(o * 40))
+}
+
+// Expand converts a partial ofsetted bitmask into a full-sized mask.
+//
+// All bits non-representable on the offset will be zero.
+func (o Offset) Expand(b Bits64) Bits128 {
+	if o < 0 || o > 3 {
+		return Bits128{0x0, 0x0}
+	}
+	return Bits128{uint64(b), 0x0}.ShiftLeft(uint8(o * 40))
+}
+
+// Cut returns the part of the full bitmask representable on this offset.
+func (o Offset) Cut(b Bits128) Bits64 {
+	b = b.ShiftRight(uint8(o * 40))
+	return Bits64(b.Lo)
 }
 
 // Offset returns the Offset capable of representing this Preset.
 //
 // This function helps to determine the offset to use in AWPresetEntries
-func (p Preset) Offset() FuseOffset {
-	return FuseOffset(int(p) / 10)
+func (p Preset) Offset() Offset {
+	return Offset(int(p) / 10)
 }
 
 type AWPresetEntriesQuery struct {
-	Offset FuseOffset
+	Offset Offset
 }
 
 func init() { registerRequest(func() AWRequest { return &AWPresetEntriesQuery{} }) }
@@ -1499,7 +1514,7 @@ func (a *AWPresetEntriesQuery) requestSignature() string {
 	return "#PE\x01\x01"
 }
 func (a *AWPresetEntriesQuery) unpackRequest(cmd string) {
-	a.Offset = toFuseOffset(cmd[3:5])
+	a.Offset = toOffset(cmd[3:5])
 }
 func (a *AWPresetEntriesQuery) packRequest() string {
 	return "#PE" + a.Offset.toWire()
@@ -2577,7 +2592,7 @@ func init() { registerResponse(func() AWResponse { return &AWTitle{} }) }
 func init() { registerResponse(func() AWResponse { return &AWTitle{Title: " "} }) }
 
 func (a *AWTitle) responseSignature() string {
-	return "TITLE:\xF7"[:min(len(a.Title)+6, 7)]
+	return "TITLE:\x7F"[:min(len(a.Title)+6, 7)]
 }
 func (a *AWTitle) unpackResponse(cmd string) {
 	a.Title = cmd[6:]

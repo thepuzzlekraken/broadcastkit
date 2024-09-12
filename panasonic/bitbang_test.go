@@ -1,6 +1,7 @@
 package panasonic
 
 import (
+	"encoding/binary"
 	"math/rand/v2"
 	"testing"
 )
@@ -151,51 +152,51 @@ func Test_match(t *testing.T) {
 func TestFuseSet_Set(t *testing.T) {
 	tests := []struct {
 		name     string
-		initial  FuseSet
+		initial  Bits128
 		index    uint8
-		expected FuseSet
+		expected Bits128
 	}{
 		{
 			name:     "Set first bit",
-			initial:  FuseSet{0, 0, 0, 0},
+			initial:  Bits128{0, 0},
 			index:    0,
-			expected: FuseSet{1, 0, 0, 0},
+			expected: Bits128{1, 0},
 		},
 		{
-			name:     "Set last bit in first element",
-			initial:  FuseSet{0, 0, 0, 0},
-			index:    31,
-			expected: FuseSet{1 << 31, 0, 0, 0},
+			name:     "Set last bit in lo element",
+			initial:  Bits128{0, 0},
+			index:    63,
+			expected: Bits128{1 << 63, 0},
 		},
 		{
-			name:     "Set first bit in second element",
-			initial:  FuseSet{0, 0, 0, 0},
-			index:    32,
-			expected: FuseSet{0, 1, 0, 0},
+			name:     "Set first bit in hi element",
+			initial:  Bits128{0, 0},
+			index:    64,
+			expected: Bits128{0, 1},
 		},
 		{
-			name:     "Set bit in middle of third element",
-			initial:  FuseSet{0, 0, 0, 0},
+			name:     "Set bit in middle of hi element",
+			initial:  Bits128{0, 0},
 			index:    85,
-			expected: FuseSet{0, 0, 1 << 21, 0},
+			expected: Bits128{0, 1 << 21},
 		},
 		{
 			name:     "Set bit that's already set",
-			initial:  FuseSet{1 << 5, 0, 0, 0},
+			initial:  Bits128{1 << 5, 0},
 			index:    5,
-			expected: FuseSet{1 << 5, 0, 0, 0},
+			expected: Bits128{1 << 5, 0},
 		},
 		{
 			name:     "Set with multiple bits",
-			initial:  FuseSet{1, 0, 1 << 15, 0},
+			initial:  Bits128{1, 32768},
 			index:    33,
-			expected: FuseSet{1, 2, 1 << 15, 0},
+			expected: Bits128{8589934593, 32768},
 		},
 		{
 			name:     "Set last possible bit",
-			initial:  FuseSet{0, 0, 0, 0},
+			initial:  Bits128{0, 0},
 			index:    127,
-			expected: FuseSet{0, 0, 0, 1 << 31},
+			expected: Bits128{0, 1 << 63},
 		},
 	}
 
@@ -211,51 +212,51 @@ func TestFuseSet_Set(t *testing.T) {
 func TestFuseSet_Clear(t *testing.T) {
 	tests := []struct {
 		name     string
-		initial  FuseSet
+		initial  Bits128
 		index    uint8
-		expected FuseSet
+		expected Bits128
 	}{
 		{
 			name:     "Clear first bit",
-			initial:  FuseSet{1, 0, 0, 0},
+			initial:  Bits128{1, 0},
 			index:    0,
-			expected: FuseSet{0, 0, 0, 0},
+			expected: Bits128{0, 0},
 		},
 		{
-			name:     "Clear last bit in first element",
-			initial:  FuseSet{1 << 31, 0, 0, 0},
+			name:     "Clear last bit in lo element",
+			initial:  Bits128{1 << 31, 0},
 			index:    31,
-			expected: FuseSet{0, 0, 0, 0},
+			expected: Bits128{0, 0},
 		},
 		{
-			name:     "Clear first bit in second element",
-			initial:  FuseSet{0, 1, 0, 0},
-			index:    32,
-			expected: FuseSet{0, 0, 0, 0},
+			name:     "Clear first bit in hi element",
+			initial:  Bits128{0, 1},
+			index:    64,
+			expected: Bits128{0, 0},
 		},
 		{
-			name:     "Clear bit in middle of third element",
-			initial:  FuseSet{0, 0, 1 << 21, 0},
+			name:     "Clear bit in middle of hi element",
+			initial:  Bits128{0, 1 << 21},
 			index:    85,
-			expected: FuseSet{0, 0, 0, 0},
+			expected: Bits128{0, 0},
 		},
 		{
 			name:     "Clear bit that's already cleared",
-			initial:  FuseSet{3, 0, 0, 0},
+			initial:  Bits128{3, 0},
 			index:    5,
-			expected: FuseSet{3, 0, 0, 0},
+			expected: Bits128{3, 0},
 		},
 		{
 			name:     "Clear with multiple bits set",
-			initial:  FuseSet{0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
+			initial:  Bits128{0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF},
 			index:    33,
-			expected: FuseSet{0xFFFFFFFF, 0xFFFFFFFD, 0xFFFFFFFF, 0xFFFFFFFF},
+			expected: Bits128{0xFFFFFFFDFFFFFFFF, 0xFFFFFFFFFFFFFFFF},
 		},
 		{
 			name:     "Clear last possible bit",
-			initial:  FuseSet{0, 1, 0, 1 << 31},
+			initial:  Bits128{6845, 1 << 63},
 			index:    127,
-			expected: FuseSet{0, 1, 0, 0},
+			expected: Bits128{6845, 0},
 		},
 	}
 
@@ -271,45 +272,45 @@ func TestFuseSet_Clear(t *testing.T) {
 func TestFuseSet_Diff(t *testing.T) {
 	tests := []struct {
 		name     string
-		f        FuseSet
-		g        FuseSet
-		expected FuseSet
+		f        Bits128
+		g        Bits128
+		expected Bits128
 	}{
 		{
 			name:     "All zeros",
-			f:        FuseSet{0, 0, 0, 0},
-			g:        FuseSet{0, 0, 0, 0},
-			expected: FuseSet{0, 0, 0, 0},
+			f:        Bits128{0, 0},
+			g:        Bits128{0, 0},
+			expected: Bits128{0, 0},
 		},
 		{
 			name:     "All ones",
-			f:        FuseSet{0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
-			g:        FuseSet{0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
-			expected: FuseSet{0, 0, 0, 0},
+			f:        Bits128{0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF},
+			g:        Bits128{0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF},
+			expected: Bits128{0, 0},
 		},
 		{
 			name:     "Alternating bits",
-			f:        FuseSet{0xAAAAAAAA, 0xAAAAAAAA, 0xAAAAAAAA, 0xAAAAAAAA},
-			g:        FuseSet{0x55555555, 0x55555555, 0x55555555, 0x55555555},
-			expected: FuseSet{0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
+			f:        Bits128{0xAAAAAAAAAAAAAAAA, 0xAAAAAAAAAAAAAAAA},
+			g:        Bits128{0x5555555555555555, 0x5555555555555555},
+			expected: Bits128{0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF},
 		},
 		{
 			name:     "Single bit difference",
-			f:        FuseSet{1, 0, 0, 0},
-			g:        FuseSet{0, 0, 0, 0},
-			expected: FuseSet{1, 0, 0, 0},
+			f:        Bits128{1, 0},
+			g:        Bits128{0, 0},
+			expected: Bits128{1, 0},
 		},
 		{
 			name:     "Mixed differences",
-			f:        FuseSet{0x12345678, 0x9ABCDEF0, 0xFEDCBA98, 0x76543210},
-			g:        FuseSet{0xFEDCBA98, 0x76543210, 0x12345678, 0x9ABCDEF0},
-			expected: FuseSet{0xECE8ECE0, 0xECE8ECE0, 0xECE8ECE0, 0xECE8ECE0},
+			f:        Bits128{0x123456789ABCDEF0, 0xFEDCBA9876543210},
+			g:        Bits128{0xFEDCBA9876543210, 0x123456789ABCDEF0},
+			expected: Bits128{0xECE8ECE0ECE8ECE0, 0xECE8ECE0ECE8ECE0},
 		},
 		{
 			name:     "Partial differences",
-			f:        FuseSet{0xFFFF0000, 0x0000FFFF, 0xF0F0F0F0, 0x0F0F0F0F},
-			g:        FuseSet{0x0000FFFF, 0xFFFF0000, 0x0F0F0F0F, 0xF0F0F0F0},
-			expected: FuseSet{0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
+			f:        Bits128{0xFFFF00000000FFFF, 0xF0F0F0F00F0F0F0F},
+			g:        Bits128{0x0000FFFFFFFF0000, 0x0F0F0F0FF0F0F0F0},
+			expected: Bits128{0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF},
 		},
 	}
 
@@ -325,45 +326,45 @@ func TestFuseSet_Diff(t *testing.T) {
 func TestFuseSet_Union(t *testing.T) {
 	tests := []struct {
 		name     string
-		f        FuseSet
-		g        FuseSet
-		expected FuseSet
+		f        Bits128
+		g        Bits128
+		expected Bits128
 	}{
 		{
 			name:     "Union of empty sets",
-			f:        FuseSet{0, 0, 0, 0},
-			g:        FuseSet{0, 0, 0, 0},
-			expected: FuseSet{0, 0, 0, 0},
+			f:        Bits128{0, 0},
+			g:        Bits128{0, 0},
+			expected: Bits128{0, 0},
 		},
 		{
 			name:     "Union with self",
-			f:        FuseSet{0xAAAAAAAA, 0xAAAAAAAA, 0xAAAAAAAA, 0xAAAAAAAA},
-			g:        FuseSet{0xAAAAAAAA, 0xAAAAAAAA, 0xAAAAAAAA, 0xAAAAAAAA},
-			expected: FuseSet{0xAAAAAAAA, 0xAAAAAAAA, 0xAAAAAAAA, 0xAAAAAAAA},
+			f:        Bits128{0xAAAAAAAAAAAAAAAA, 0xAAAAAAAAAAAAAAAA},
+			g:        Bits128{0xAAAAAAAAAAAAAAAA, 0xAAAAAAAAAAAAAAAA},
+			expected: Bits128{0xAAAAAAAAAAAAAAAA, 0xAAAAAAAAAAAAAAAA},
 		},
 		{
 			name:     "Union of complementary sets",
-			f:        FuseSet{0xAAAAAAAA, 0xAAAAAAAA, 0xAAAAAAAA, 0xAAAAAAAA},
-			g:        FuseSet{0x55555555, 0x55555555, 0x55555555, 0x55555555},
-			expected: FuseSet{0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
+			f:        Bits128{0xAAAAAAAAAAAAAAAA, 0xAAAAAAAAAAAAAAAA},
+			g:        Bits128{0x5555555555555555, 0x5555555555555555},
+			expected: Bits128{0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF},
 		},
 		{
 			name:     "Union with one empty set",
-			f:        FuseSet{0x12345678, 0x9ABCDEF0, 0, 0},
-			g:        FuseSet{0, 0, 0, 0},
-			expected: FuseSet{0x12345678, 0x9ABCDEF0, 0, 0},
+			f:        Bits128{0x12312345678, 0xBEEF9ABCDEF0},
+			g:        Bits128{0, 0},
+			expected: Bits128{0x12312345678, 0xBEEF9ABCDEF0},
 		},
 		{
 			name:     "Union of partially overlapping sets",
-			f:        FuseSet{0xF0F0F0F0, 0xF0F0F0F0, 0, 0},
-			g:        FuseSet{0x0F0F0F0F, 0x0F0F0F0F, 0, 0},
-			expected: FuseSet{0xFFFFFFFF, 0xFFFFFFFF, 0, 0},
+			f:        Bits128{0xF0F0F0F0FF, 0xF0F0F0F000},
+			g:        Bits128{0x0F0F0F0FFF, 0x0F0F0F0FF0},
+			expected: Bits128{0xFFFFFFFFFF, 0xFFFFFFFFF0},
 		},
 		{
 			name:     "Union of sets with bits in different positions",
-			f:        FuseSet{0x00FF00FF, 0, 0xFF00FF00, 0},
-			g:        FuseSet{0, 0xFF00FF00, 0, 0x00FF00FF},
-			expected: FuseSet{0x00FF00FF, 0xFF00FF00, 0xFF00FF00, 0x00FF00FF},
+			f:        Bits128{0x00FF00FFFF00FF00, 0},
+			g:        Bits128{0, 0xFF00FF0000FF00FF},
+			expected: Bits128{0x00FF00FFFF00FF00, 0xFF00FF0000FF00FF},
 		},
 	}
 
@@ -379,45 +380,45 @@ func TestFuseSet_Union(t *testing.T) {
 func TestFuseSet_Intersection(t *testing.T) {
 	tests := []struct {
 		name     string
-		f        FuseSet
-		g        FuseSet
-		expected FuseSet
+		f        Bits128
+		g        Bits128
+		expected Bits128
 	}{
 		{
 			name:     "Intersection of full sets",
-			f:        FuseSet{0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
-			g:        FuseSet{0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
-			expected: FuseSet{0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
+			f:        Bits128{0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF},
+			g:        Bits128{0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF},
+			expected: Bits128{0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF},
 		},
 		{
 			name:     "Intersection with empty set",
-			f:        FuseSet{0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
-			g:        FuseSet{0, 0, 0, 0},
-			expected: FuseSet{0, 0, 0, 0},
+			f:        Bits128{0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF},
+			g:        Bits128{0, 0},
+			expected: Bits128{0, 0},
 		},
 		{
 			name:     "Intersection of disjoint sets",
-			f:        FuseSet{0xAAAAAAAA, 0xAAAAAAAA, 0xAAAAAAAA, 0xAAAAAAAA},
-			g:        FuseSet{0x55555555, 0x55555555, 0x55555555, 0x55555555},
-			expected: FuseSet{0, 0, 0, 0},
+			f:        Bits128{0xAAAAAAAAAAAAAAAA, 0xAAAAAAAAAAAAAAAA},
+			g:        Bits128{0x5555555555555555, 0x5555555555555555},
+			expected: Bits128{0, 0},
 		},
 		{
 			name:     "Intersection of partially overlapping sets",
-			f:        FuseSet{0xF0F0F0F0, 0xF0F0F0F0, 0xF0F0F0F0, 0xF0F0F0F0},
-			g:        FuseSet{0xFF00FF00, 0xFF00FF00, 0xFF00FF00, 0xFF00FF00},
-			expected: FuseSet{0xF000F000, 0xF000F000, 0xF000F000, 0xF000F000},
+			f:        Bits128{0xF0F0F0F0F0F0F0F0, 0xF0F0F0F0F0F0F0F0},
+			g:        Bits128{0xFF00FF00FF00FF00, 0xFF00FF00FF00FF00},
+			expected: Bits128{0xF000F000F000F000, 0xF000F000F000F000},
 		},
 		{
 			name:     "Intersection with self",
-			f:        FuseSet{0x12345678, 0x9ABCDEF0, 0xFEDCBA98, 0x76543210},
-			g:        FuseSet{0x12345678, 0x9ABCDEF0, 0xFEDCBA98, 0x76543210},
-			expected: FuseSet{0x12345678, 0x9ABCDEF0, 0xFEDCBA98, 0x76543210},
+			f:        Bits128{0x123456789ABCDEF0, 0xFEDCBA9876543210},
+			g:        Bits128{0x123456789ABCDEF0, 0xFEDCBA9876543210},
+			expected: Bits128{0x123456789ABCDEF0, 0xFEDCBA9876543210},
 		},
 		{
 			name:     "Intersection with alternating bits",
-			f:        FuseSet{0xAAAAAAAA, 0xAAAAAAAA, 0xAAAAAAAA, 0xAAAAAAAA},
-			g:        FuseSet{0xCCCCCCCC, 0xCCCCCCCC, 0xCCCCCCCC, 0xCCCCCCCC},
-			expected: FuseSet{0x88888888, 0x88888888, 0x88888888, 0x88888888},
+			f:        Bits128{0xAAAAAAAAAAAAAAAA, 0xAAAAAAAAAAAAAAAA},
+			g:        Bits128{0xCCCCCCCCCCCCCCCC, 0xCCCCCCCCCCCCCCCC},
+			expected: Bits128{0x8888888888888888, 0x8888888888888888},
 		},
 	}
 
@@ -433,69 +434,69 @@ func TestFuseSet_Intersection(t *testing.T) {
 func TestFuseSet_ShiftLeft(t *testing.T) {
 	tests := []struct {
 		name     string
-		initial  FuseSet
-		shift    uint
-		expected FuseSet
+		initial  Bits128
+		shift    uint8
+		expected Bits128
 	}{
 		{
 			name:     "Shift by 0",
-			initial:  FuseSet{0x12345678, 0x9ABCDEF0, 0xFEDCBA98, 0x76543210},
+			initial:  Bits128{0x123456789ABCDEF0, 0xFEDCBA9876543210},
 			shift:    0,
-			expected: FuseSet{0x12345678, 0x9ABCDEF0, 0xFEDCBA98, 0x76543210},
+			expected: Bits128{0x123456789ABCDEF0, 0xFEDCBA9876543210},
 		},
 		{
 			name:     "Shift by 1",
-			initial:  FuseSet{0x80000001, 0x80000001, 0x80000001, 0x80000001},
+			initial:  Bits128{0x8000000180000001, 0x8000000180000001},
 			shift:    1,
-			expected: FuseSet{0x00000002, 0x00000003, 0x00000003, 0x00000003},
+			expected: Bits128{0x0000000300000002, 0x0000000300000003},
 		},
 		{
 			name:     "Shift by 31",
-			initial:  FuseSet{0xFFFFFFFF, 0x00000000, 0x00000000, 0x00000000},
+			initial:  Bits128{0x00000000FFFFFFFF, 0x0000000000000000},
 			shift:    31,
-			expected: FuseSet{0x80000000, 0x7FFFFFFF, 0x00000000, 0x00000000},
+			expected: Bits128{0x7FFFFFFF80000000, 0x0000000000000000},
 		},
 		{
 			name:     "Shift by 32",
-			initial:  FuseSet{0xFFFFFFFF, 0x00000000, 0x00000000, 0x00000000},
+			initial:  Bits128{0x00000000FFFFFFFF, 0x0000000000000000},
 			shift:    32,
-			expected: FuseSet{0x00000000, 0xFFFFFFFF, 0x00000000, 0x00000000},
+			expected: Bits128{0xFFFFFFFF00000000, 0x0000000000000000},
 		},
 		{
 			name:     "Shift by 33",
-			initial:  FuseSet{0xFFFFFFFF, 0x00000000, 0x00000000, 0x00000000},
+			initial:  Bits128{0x00000000FFFFFFFF, 0x0000000000000000},
 			shift:    33,
-			expected: FuseSet{0x00000000, 0xFFFFFFFE, 0x00000001, 0x00000000},
+			expected: Bits128{0xFFFFFFFE00000000, 0x0000000000000001},
 		},
 		{
 			name:     "Shift by 64",
-			initial:  FuseSet{0xFFFFFFFF, 0xFFFFFFFF, 0x00000000, 0x00000000},
+			initial:  Bits128{0xFFFFFFFFFFFFFFFF, 0x0000000000000000},
 			shift:    64,
-			expected: FuseSet{0x00000000, 0x00000000, 0xFFFFFFFF, 0xFFFFFFFF},
+			expected: Bits128{0x0000000000000000, 0xFFFFFFFFFFFFFFFF},
 		},
 		{
 			name:     "Shift by 96",
-			initial:  FuseSet{0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x00000000},
+			initial:  Bits128{0xFFFFFFFFFFFFFFFF, 0xABCDEF0123456789},
 			shift:    96,
-			expected: FuseSet{0x00000000, 0x00000000, 0x00000000, 0xFFFFFFFF},
+			expected: Bits128{0x0000000000000000, 0xFFFFFFFF00000000},
 		},
 		{
 			name:     "Shift by 127",
-			initial:  FuseSet{0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
+			initial:  Bits128{0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF},
 			shift:    127,
-			expected: FuseSet{0x00000000, 0x00000000, 0x00000000, 0x80000000},
+			expected: Bits128{0x0000000000000000, 0x8000000000000000},
 		},
 		{
 			name:     "Shift by 128",
-			initial:  FuseSet{0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
+			initial:  Bits128{0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF},
 			shift:    128,
-			expected: FuseSet{0x00000000, 0x00000000, 0x00000000, 0x00000000},
+			expected: Bits128{0x0000000000000000, 0x0000000000000000},
 		},
 		{
 			name:     "Shift by 129",
-			initial:  FuseSet{0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
+			initial:  Bits128{0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF},
 			shift:    129,
-			expected: FuseSet{0x00000000, 0x00000000, 0x00000000, 0x00000000},
+			expected: Bits128{0x0000000000000000, 0x0000000000000000},
 		},
 	}
 
@@ -511,69 +512,69 @@ func TestFuseSet_ShiftLeft(t *testing.T) {
 func TestFuseSet_ShiftRight(t *testing.T) {
 	tests := []struct {
 		name     string
-		initial  FuseSet
-		shift    uint
-		expected FuseSet
+		initial  Bits128
+		shift    uint8
+		expected Bits128
 	}{
 		{
 			name:     "Shift by 0",
-			initial:  FuseSet{0x12345678, 0x9ABCDEF0, 0xFEDCBA98, 0x76543210},
+			initial:  Bits128{0x123456789ABCDEF0, 0xFEDCBA9876543210},
 			shift:    0,
-			expected: FuseSet{0x12345678, 0x9ABCDEF0, 0xFEDCBA98, 0x76543210},
+			expected: Bits128{0x123456789ABCDEF0, 0xFEDCBA9876543210},
 		},
 		{
 			name:     "Shift by 1",
-			initial:  FuseSet{0x80000001, 0x80000001, 0x80000001, 0x80000001},
+			initial:  Bits128{0x8000000180000001, 0x8000000180000001},
 			shift:    1,
-			expected: FuseSet{0xC0000000, 0xC0000000, 0xC0000000, 0x40000000},
+			expected: Bits128{0xC0000000C0000000, 0x40000000C0000000},
 		},
 		{
 			name:     "Shift by 31",
-			initial:  FuseSet{0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
+			initial:  Bits128{0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF},
 			shift:    31,
-			expected: FuseSet{0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x00000001},
+			expected: Bits128{0xFFFFFFFFFFFFFFFF, 0x00000001FFFFFFFF},
 		},
 		{
 			name:     "Shift by 32",
-			initial:  FuseSet{0x00000000, 0xFFFFFFFF, 0x00000000, 0x00000000},
+			initial:  Bits128{0xFFFFFFFF00000000, 0x0000000000000000},
 			shift:    32,
-			expected: FuseSet{0xFFFFFFFF, 0x00000000, 0x00000000, 0x00000000},
+			expected: Bits128{0x00000000FFFFFFFF, 0x0000000000000000},
 		},
 		{
 			name:     "Shift by 33",
-			initial:  FuseSet{0x00000000, 0xFFFFFFFF, 0x80000000, 0x00000000},
+			initial:  Bits128{0xFFFFFFFF00000000, 0x0000000080000000},
 			shift:    33,
-			expected: FuseSet{0x7FFFFFFF, 0x40000000, 0x00000000, 0x00000000},
+			expected: Bits128{0x400000007FFFFFFF, 0x0000000000000000},
 		},
 		{
 			name:     "Shift by 64",
-			initial:  FuseSet{0x00000000, 0x00000000, 0xFFFFFFFF, 0xFFFFFFFF},
+			initial:  Bits128{0x0000000000000000, 0xFFFFFFFFFFFFFFFF},
 			shift:    64,
-			expected: FuseSet{0xFFFFFFFF, 0xFFFFFFFF, 0x00000000, 0x00000000},
+			expected: Bits128{0xFFFFFFFFFFFFFFFF, 0x0000000000000000},
 		},
 		{
 			name:     "Shift by 96",
-			initial:  FuseSet{0x00000000, 0x00000000, 0x00000000, 0xFFFFFFFF},
+			initial:  Bits128{0x0000000000000000, 0xFFFFFFFF00000000},
 			shift:    96,
-			expected: FuseSet{0xFFFFFFFF, 0x00000000, 0x00000000, 0x00000000},
+			expected: Bits128{0x00000000FFFFFFFF, 0x0000000000000000},
 		},
 		{
 			name:     "Shift by 127",
-			initial:  FuseSet{0x00000000, 0x00000000, 0x00000000, 0x80000000},
+			initial:  Bits128{0x0000000000000000, 0x8000000000000000},
 			shift:    127,
-			expected: FuseSet{0x00000001, 0x00000000, 0x00000000, 0x00000000},
+			expected: Bits128{0x0000000000000001, 0x0000000000000000},
 		},
 		{
 			name:     "Shift by 128",
-			initial:  FuseSet{0x00000000, 0x00000000, 0x00000000, 0xFFFFFFFF},
+			initial:  Bits128{0x0000000000000000, 0xFFFFFFFF00000000},
 			shift:    128,
-			expected: FuseSet{0x00000000, 0x00000000, 0x00000000, 0x00000000},
+			expected: Bits128{0x0000000000000000, 0x0000000000000000},
 		},
 		{
 			name:     "Shift by 129",
-			initial:  FuseSet{0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
+			initial:  Bits128{0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF},
 			shift:    129,
-			expected: FuseSet{0x00000000, 0x00000000, 0x00000000, 0x00000000},
+			expected: Bits128{0x0000000000000000, 0x0000000000000000},
 		},
 	}
 
@@ -589,33 +590,33 @@ func TestFuseSet_ShiftRight(t *testing.T) {
 func TestFuseSet_Invert(t *testing.T) {
 	tests := []struct {
 		name     string
-		initial  FuseSet
-		expected FuseSet
+		initial  Bits128
+		expected Bits128
 	}{
 		{
 			name:     "Invert all zeros",
-			initial:  FuseSet{0x00000000, 0x00000000, 0x00000000, 0x00000000},
-			expected: FuseSet{0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
+			initial:  Bits128{0x0000000000000000, 0x0000000000000000},
+			expected: Bits128{0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF},
 		},
 		{
 			name:     "Invert all ones",
-			initial:  FuseSet{0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
-			expected: FuseSet{0x00000000, 0x00000000, 0x00000000, 0x00000000},
+			initial:  Bits128{0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF},
+			expected: Bits128{0x0000000000000000, 0x0000000000000000},
 		},
 		{
 			name:     "Invert alternating bits",
-			initial:  FuseSet{0xAAAAAAAA, 0xAAAAAAAA, 0xAAAAAAAA, 0xAAAAAAAA},
-			expected: FuseSet{0x55555555, 0x55555555, 0x55555555, 0x55555555},
+			initial:  Bits128{0xAAAAAAAAAAAAAAAA, 0xAAAAAAAAAAAAAAAA},
+			expected: Bits128{0x5555555555555555, 0x5555555555555555},
 		},
 		{
 			name:     "Invert mixed values",
-			initial:  FuseSet{0x12345678, 0x9ABCDEF0, 0xFEDCBA98, 0x76543210},
-			expected: FuseSet{0xEDCBA987, 0x6543210F, 0x01234567, 0x89ABCDEF},
+			initial:  Bits128{0x123456789ABCDEF0, 0xFEDCBA9876543210},
+			expected: Bits128{0xEDCBA9876543210F, 0x0123456789ABCDEF},
 		},
 		{
 			name:     "Invert other pattern",
-			initial:  FuseSet{0xFFFFFFFF, 0x00000000, 0xFFFFFFFF, 0x00000000},
-			expected: FuseSet{0x00000000, 0xFFFFFFFF, 0x00000000, 0xFFFFFFFF},
+			initial:  Bits128{0xFFFFFFFF00000000, 0xFFFFFFFF00000000},
+			expected: Bits128{0x00000000FFFFFFFF, 0x00000000FFFFFFFF},
 		},
 	}
 
@@ -630,39 +631,44 @@ func TestFuseSet_Invert(t *testing.T) {
 }
 
 var charSets = []string{
-	"0123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz",
+	"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz:_",
 	"0123456789ABCDEF",
 	"0123456789",
 	"Ee",
 	"!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~",
 }
 
-var detRand = rand.NewChaCha8([32]byte{}) // deterministic is better than flaky
-
-func randChar(set byte) byte {
-	len := len(charSets[set])
-	i := detRand.Uint64() % uint64(len) // not totally uniform, ¯\_(ツ)_/¯
-	return charSets[set][i]
-}
-
-func randomMatch(pattern string) string {
+func generateMatch(pattern string, seed int64) string {
+	// deterministic is better than flaky
+	var s [32]byte
+	binary.NativeEndian.PutUint64(s[:], uint64(seed))
+	rnd := rand.NewChaCha8(s)
 	b := make([]byte, len(pattern))
 	for i := 0; i < len(pattern); i++ {
-		if pattern[i] == '\x7F' {
+		c := pattern[i]
+		if c == '\x7F' {
 			if i != len(pattern)-1 {
 				panic("broken pattern terminator")
 			}
 			b[i] = 'X'
 			return string(b) + "XX"
 		}
-		if pattern[i] >= 32 {
+		if c >= 32 {
 			b[i] = pattern[i]
 			continue
 		}
-		if int(pattern[i]) >= len(charSets) {
+		if int(c) >= len(charSets) {
 			panic("broken pattern matchset")
 		}
-		b[i] = randChar(pattern[i])
+		switch seed {
+		case 0:
+			b[i] = charSets[c][0]
+		case -1:
+			b[i] = charSets[c][len(charSets[c])-1]
+		default:
+			// good enough ¯\_(ツ)_/¯
+			b[i] = charSets[c][rnd.Uint64()%uint64(len(charSets[c]))]
+		}
 	}
 	return string(b)
 }

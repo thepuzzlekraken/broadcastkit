@@ -3,34 +3,51 @@ package panasonic
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"testing"
 )
 
 func Test_RequestConsistency(t *testing.T) {
 	for _, tt := range awRequestTable {
-		t.Run(reflect.TypeOf(tt.new()).Elem().Name(), func(t *testing.T) {
-			str1 := randomMatch(tt.sig)
-			cmd := tt.new()
-			cmd.unpackRequest(str1)
-			str2 := cmd.packRequest()
-			if str1 != str2 {
-				t.Errorf("%v.packRequest() = %v, want %v", reflect.TypeOf(cmd), str2, str1)
+		name := reflect.TypeOf(tt.new()).Elem().Name()
+		had := make([]string, 0, 4)
+		for _, seed := range []int64{0, 746652860576448003, -2321909154513872682, -1} {
+			str1 := generateMatch(tt.sig, seed)
+			if slices.Contains(had, str1) {
+				continue
 			}
-		})
+			had = append(had, str1)
+			t.Run(name+" "+str1, func(t *testing.T) {
+				cmd := tt.new()
+				cmd.unpackRequest(str1)
+				str2 := cmd.packRequest()
+				if str1 != str2 {
+					t.Errorf("%v.packRequest() = %v, want %v", reflect.TypeOf(cmd), str2, str1)
+				}
+			})
+		}
 	}
 }
 
 func Test_ResponseConsistency(t *testing.T) {
 	for _, tt := range awResponseTable {
-		t.Run(reflect.TypeOf(tt.new()).Elem().Name(), func(t *testing.T) {
-			str1 := randomMatch(tt.sig)
-			cmd := tt.new()
-			cmd.unpackResponse(str1)
-			str2 := cmd.packResponse()
-			if str1 != str2 {
-				t.Errorf("%v.packResponse() = %v, want %v", reflect.TypeOf(cmd), str2, str1)
+		name := reflect.TypeOf(tt.new()).Elem().Name()
+		had := make([]string, 0, 4)
+		for _, seed := range []int64{0, -1, 746652860576448003, -2321909154513872682} {
+			str1 := generateMatch(tt.sig, seed)
+			if slices.Contains(had, str1) {
+				continue
 			}
-		})
+			had = append(had, str1)
+			t.Run(name+" "+str1, func(t *testing.T) {
+				cmd := tt.new()
+				cmd.unpackResponse(str1)
+				str2 := cmd.packResponse()
+				if str1 != str2 {
+					t.Errorf("%v.packResponse() = %v, want %v", reflect.TypeOf(cmd), str2, str1)
+				}
+			})
+		}
 	}
 }
 
@@ -112,10 +129,66 @@ func TestAWRequest(t *testing.T) {
 			acceptable: true,
 			response:   &AWInstall{Position: HangingPosition},
 		},
+		{
+			name:       "Pan",
+			reqStr:     "#P50",
+			request:    &AWPan{Pan: 0},
+			acceptable: true,
+			response:   &AWPan{Pan: 0},
+		},
+		{
+			name:       "Pan Up",
+			reqStr:     "#P75",
+			request:    &AWPan{Pan: 25},
+			acceptable: true,
+			response:   &AWPan{Pan: 25},
+		},
+		{
+			name:       "Pan Down",
+			reqStr:     "#P20",
+			request:    &AWPan{Pan: -30},
+			acceptable: true,
+			response:   &AWPan{Pan: -30},
+		},
+		{
+			name:       "Pan Invalid",
+			reqStr:     "#P00",
+			request:    &AWPan{Pan: -50},
+			acceptable: false,
+			response:   &AWPan{Pan: -50},
+		},
+		{
+			name:       "Tilt",
+			reqStr:     "#T50",
+			request:    &AWTilt{Tilt: 0},
+			acceptable: true,
+			response:   &AWTilt{Tilt: 0},
+		},
+		{
+			name:       "Tilt Up",
+			reqStr:     "#T99",
+			request:    &AWTilt{Tilt: 49},
+			acceptable: true,
+			response:   &AWTilt{Tilt: 49},
+		},
+		{
+			name:       "Tilt Down",
+			reqStr:     "#T01",
+			request:    &AWTilt{Tilt: -49},
+			acceptable: true,
+			response:   &AWTilt{Tilt: -49},
+		},
+		{
+			name:       "Preset Recall",
+			reqStr:     "#R42",
+			request:    &AWPresetRecall{Preset: 42},
+			acceptable: true,
+			response:   &AWPreset{Preset: 42},
+		},
 	}
 
 	for _, tt := range tests {
-		t.Run(fmt.Sprintf("%s (%s)", tt.name, tt.reqStr), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s %s", tt.name, tt.reqStr), func(t *testing.T) {
 			sig := tt.request.requestSignature()
 			if !match(sig, tt.reqStr) {
 				t.Errorf("match(%v,%v) = false, want true", sig, tt.reqStr)

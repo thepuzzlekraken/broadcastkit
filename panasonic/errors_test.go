@@ -13,27 +13,27 @@ func TestAWErrorResponseSignature(t *testing.T) {
 		{
 			name:    "Empty flag",
 			flag:    "",
-			wantSig: "\x03R\x01:",
+			wantSig: "\x03R\x02:",
 		},
 		{
 			name:    "Short flag",
 			flag:    " ",
-			wantSig: "\x03R\x01:\xF7",
+			wantSig: "\x03R\x02:\x7F",
 		},
 		{
 			name:    "Medium flag",
 			flag:    "AB",
-			wantSig: "\x03R\x01:\xF7",
+			wantSig: "\x03R\x02:\x7F",
 		},
 		{
 			name:    "Max length flag",
 			flag:    "   ",
-			wantSig: "\x03R\x01:\xF7",
+			wantSig: "\x03R\x02:\x7F",
 		},
 		{
 			name:    "Oversized flag",
 			flag:    "TOOLONG",
-			wantSig: "\x03R\x01:\xF7",
+			wantSig: "\x03R\x02:\x7F",
 		},
 	}
 
@@ -42,7 +42,7 @@ func TestAWErrorResponseSignature(t *testing.T) {
 			e := &AWError{Flag: tt.flag}
 			gotSig := e.responseSignature()
 			if gotSig != tt.wantSig {
-				t.Errorf("AWError.responseSignature() sig = %v, want %v", gotSig, tt.wantSig)
+				t.Errorf("AWError.responseSignature() sig = %#v, want %#v", gotSig, tt.wantSig)
 			}
 		})
 	}

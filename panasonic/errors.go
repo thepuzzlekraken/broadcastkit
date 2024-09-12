@@ -35,7 +35,7 @@ func (e *AWError) Error() string {
 }
 
 func (e *AWError) responseSignature() string {
-	sig := "\x03R\x01:\xF7"
+	sig := "\x03R\x02:\x7F"
 	// return the correct-length pattern depending on flag length
 	return sig[0:min(4+len(e.Flag), 5)]
 }

@@ -1,81 +1,112 @@
 package panasonic
 
-// FuseSet is a binary field of 128 bits
-// FuseSet is little-endian: index 0 is the least significant part.
-type FuseSet [4]uint32
+// Bits64 is uint64 for binary masks
+type Bits64 uint64
 
-func (f FuseSet) Set(i uint8) FuseSet {
-	f[i/32] |= 1 << (i % 32)
-	return f
+func (b Bits64) Set(i uint8) Bits64 {
+	b |= Bits64(1) << i
+	return b
 }
-func (f FuseSet) Clear(i uint8) FuseSet {
-	f[i/32] &= ^(1 << (i % 32))
-	return f
+
+func (b Bits64) Clear(i uint8) Bits64 {
+	b &= ^(Bits64(1) << i)
+	return b
 }
-func (f FuseSet) Has(i uint8) bool {
-	return (f[i/32] & (1 << (i % 32))) != 0
+
+func (b Bits64) Has(i uint8) bool {
+	return (b & (Bits64(1) << i)) != 0
 }
-func (f FuseSet) Diff(g FuseSet) FuseSet {
-	f[0] ^= g[0]
-	f[1] ^= g[1]
-	f[2] ^= g[2]
-	f[3] ^= g[3]
-	return f
+
+func (b Bits64) Diff(g Bits64) Bits64 {
+	b ^= g
+	return b
 }
-func (f FuseSet) Union(g FuseSet) FuseSet {
-	f[0] |= g[0]
-	f[1] |= g[1]
-	f[2] |= g[2]
-	f[3] |= g[3]
-	return f
+
+func (b Bits64) Union(g Bits64) Bits64 {
+	b |= g
+	return b
 }
-func (f FuseSet) Intersection(g FuseSet) FuseSet {
-	f[0] &= g[0]
-	f[1] &= g[1]
-	f[2] &= g[2]
-	f[3] &= g[3]
-	return f
+
+func (b Bits64) Intersection(g Bits64) Bits64 {
+	b &= g
+	return b
 }
-func (f FuseSet) Invert() FuseSet {
-	f[0] = ^f[0]
-	f[1] = ^f[1]
-	f[2] = ^f[2]
-	f[3] = ^f[3]
-	return f
+
+func (b Bits64) Invert() Bits64 {
+	b = ^b
+	return b
 }
-func (f FuseSet) ShiftLeft(n uint) FuseSet {
-	for n > 32 {
-		f[3] = f[2]
-		f[2] = f[1]
-		f[1] = f[0]
-		f[0] = 0
-		n -= 32
+
+func (b Bits64) ShiftLeft(n uint8) Bits64 {
+	b <<= n
+	return b
+}
+
+func (b Bits64) ShiftRight(n uint8) Bits64 {
+	b >>= n
+	return b
+}
+
+// Bits128 is effectively a uint128 for binary masks
+type Bits128 struct {
+	Lo uint64
+	Hi uint64
+}
+
+func (b Bits128) Set(i uint8) Bits128 {
+	b.Lo |= uint64(1) << i
+	b.Hi |= uint64(1) << (i - 64)
+	return b
+}
+func (b Bits128) Clear(i uint8) Bits128 {
+	b.Lo &= ^(uint64(1) << i)
+	b.Hi &= ^(uint64(1) << (i - 64))
+	return b
+}
+func (b Bits128) Has(i uint8) bool {
+	return (b.Lo&(uint64(1)<<i))|(b.Hi&(uint64(1)<<(i-64))) != 0
+}
+func (b Bits128) Diff(g Bits128) Bits128 {
+	b.Lo ^= g.Lo
+	b.Hi ^= g.Hi
+	return b
+}
+func (b Bits128) Union(g Bits128) Bits128 {
+	b.Lo |= g.Lo
+	b.Hi |= g.Hi
+	return b
+}
+func (b Bits128) Intersection(g Bits128) Bits128 {
+	b.Lo &= g.Lo
+	b.Hi &= g.Hi
+	return b
+}
+func (b Bits128) Invert() Bits128 {
+	b.Lo = ^b.Lo
+	b.Hi = ^b.Hi
+	return b
+}
+func (b Bits128) ShiftLeft(n uint8) Bits128 {
+	if n > 64 {
+		b.Hi = b.Lo
+		b.Lo = 0
+		n -= 64
 	}
-	f[3] <<= n
-	f[3] |= (f[2] >> (32 - n))
-	f[2] <<= n
-	f[2] |= (f[1] >> (32 - n))
-	f[1] <<= n
-	f[1] |= (f[0] >> (32 - n))
-	f[0] <<= n
-	return f
+	b.Hi <<= n
+	b.Hi |= (b.Lo >> (64 - n))
+	b.Lo <<= n
+	return b
 }
-func (f FuseSet) ShiftRight(n uint) FuseSet {
-	for n > 32 {
-		f[0] = f[1]
-		f[1] = f[2]
-		f[2] = f[3]
-		f[3] = 0
-		n -= 32
+func (b Bits128) ShiftRight(n uint8) Bits128 {
+	if n > 64 {
+		b.Lo = b.Hi
+		b.Hi = 0
+		n -= 64
 	}
-	f[0] >>= n
-	f[0] |= (f[1] << (32 - n))
-	f[1] >>= n
-	f[1] |= (f[2] << (32 - n))
-	f[2] >>= n
-	f[2] |= (f[3] << (32 - n))
-	f[3] >>= n
-	return f
+	b.Lo >>= n
+	b.Lo |= (b.Hi << (64 - n))
+	b.Hi >>= n
+	return b
 }
 
 // charSet is a clever bitmask to check for ASCII char existence in a set.
