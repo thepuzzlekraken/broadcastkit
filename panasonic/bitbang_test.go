@@ -1,6 +1,7 @@
 package panasonic
 
 import (
+	"math/rand/v2"
 	"testing"
 )
 
@@ -626,4 +627,42 @@ func TestFuseSet_Invert(t *testing.T) {
 			}
 		})
 	}
+}
+
+var charSets = []string{
+	"0123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz",
+	"0123456789ABCDEF",
+	"0123456789",
+	"Ee",
+	"!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~",
+}
+
+var detRand = rand.NewChaCha8([32]byte{}) // deterministic is better than flaky
+
+func randChar(set byte) byte {
+	len := len(charSets[set])
+	i := detRand.Uint64() % uint64(len) // not totally uniform, ¯\_(ツ)_/¯
+	return charSets[set][i]
+}
+
+func randomMatch(pattern string) string {
+	b := make([]byte, len(pattern))
+	for i := 0; i < len(pattern); i++ {
+		if pattern[i] == '\x7F' {
+			if i != len(pattern)-1 {
+				panic("broken pattern terminator")
+			}
+			b[i] = 'X'
+			return string(b) + "XX"
+		}
+		if pattern[i] >= 32 {
+			b[i] = pattern[i]
+			continue
+		}
+		if int(pattern[i]) >= len(charSets) {
+			panic("broken pattern matchset")
+		}
+		b[i] = randChar(pattern[i])
+	}
+	return string(b)
 }

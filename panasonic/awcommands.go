@@ -43,7 +43,7 @@ func (a *AWPower) unpackRequest(cmd string) {
 	default:
 		a.altMode = false
 	}
-	a.Power = PowerSwitch(cmd[2])
+	a.Power = PowerSwitch(c)
 }
 func (a *AWPower) packRequest() string {
 	c := a.Power
@@ -170,11 +170,11 @@ type MoveUnit int
 
 func (m MoveUnit) toWire() string {
 	// offset and inversion for Panasonic home 0 => 0x8000
-	return int2dec(-int(m)+0x8000, 4)
+	return int2hex(-int(m)+0x8000, 4)
 }
 func toMoveUnit(hex string) MoveUnit {
 	// offset and inversion from Panasonic home 0x8000 => 0
-	return MoveUnit(-dec2int(hex[0:4]) + 0x8000)
+	return MoveUnit(-hex2int(hex[0:4]) + 0x8000)
 }
 func (m MoveUnit) Acceptable() bool {
 	// Despite the camera range being limited in reality, cameras report
@@ -292,7 +292,7 @@ func (s SpeedUnit) toWire() string {
 	return int2hex(sp, 2) + s.Table.toWire()
 }
 func toSpeedUnit(data string) SpeedUnit {
-	_ = data[3]
+	_ = data[2]
 	return SpeedUnit{
 		Speed: int(hex2int(data[0:2])),
 		Table: toSpeedTable(data[2:3]),
@@ -612,7 +612,7 @@ func (a *AWZoomTo) packRequest() string {
 	return "#AXZ" + a.Zoom.toWire()
 }
 func (a *AWZoomTo) responseSignature() string {
-	return "aXZ\x01\x01\x01"
+	return "axz\x01\x01\x01"
 }
 func (a *AWZoomTo) unpackResponse(cmd string) {
 	a.Zoom = toScaleUnit(cmd[3:6])
@@ -655,7 +655,7 @@ func (a *AWZoomResponseAlternate) responseSignature() string {
 	return "gz\x01\x01\x01"
 }
 func (a *AWZoomResponseAlternate) unpackResponse(cmd string) {
-	a.Zoom = toScaleUnit(cmd[2:4])
+	a.Zoom = toScaleUnit(cmd[2:5])
 }
 func (a *AWZoomResponseAlternate) packResponse() string {
 	return "gz" + a.Zoom.toWire()
@@ -888,7 +888,7 @@ func (a *AWAutoFocusQuery) requestSignature() string {
 }
 func (a *AWAutoFocusQuery) unpackRequest(_ string) {}
 func (a *AWAutoFocusQuery) packRequest() string {
-	return "#D2"
+	return "#D1"
 }
 
 // AWIrisTo commands the camera to set the iris to a specific value.
@@ -1022,7 +1022,7 @@ func (a *AWAutoIris) unpackRequest(cmd string) {
 	a.AutoIris = toToggle(cmd[3:4])
 }
 func (a *AWAutoIris) packRequest() string {
-	return "#d3" + a.AutoIris.toWire()
+	return "#D3" + a.AutoIris.toWire()
 }
 func (a *AWAutoIris) responseSignature() string {
 	return "d3\x02"
@@ -1405,7 +1405,7 @@ func (f FuseOffset) toWire() string {
 	return int2hex(int(f), 2)
 }
 func toFuseOffset(data string) FuseOffset {
-	return FuseOffset(dec2int(data[0:2]))
+	return FuseOffset(hex2int(data[0:2]))
 }
 
 // AWPresetEntries returns a bitmask of the stored presets.
@@ -1557,7 +1557,7 @@ func (a *AWTallyEnable) responseSignature() string {
 	return "tAE\x02"
 }
 func (a *AWTallyEnable) unpackResponse(cmd string) {
-	a.TallyEnable = toToggle(cmd[2:3])
+	a.TallyEnable = toToggle(cmd[3:4])
 }
 func (a *AWTallyEnable) packResponse() string {
 	return "tAE" + a.TallyEnable.toWire()
@@ -1611,7 +1611,7 @@ func (a *AWTallySet) unpackResponse(cmd string) {
 	a.TallyLight = toToggle(cmd[2:3])
 }
 func (a *AWTallySet) packResponse() string {
-	return "tA" + a.TallyLight.toWire()
+	return "dA" + a.TallyLight.toWire()
 }
 
 // AWTallyQuery is a request to query the current tally light status
@@ -2140,7 +2140,7 @@ func (a *AWAutoFocusQueryAlternate) requestSignature() string {
 }
 func (a *AWAutoFocusQueryAlternate) unpackRequest(_ string) {}
 func (a *AWAutoFocusQueryAlternate) packRequest() string {
-	return "OAF"
+	return "QAF"
 }
 
 // AWOneTouchFocus instruct the camrea to autofocus one time only
