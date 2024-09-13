@@ -15,8 +15,8 @@ import (
 
 const networkTimeout = 3 * time.Second
 
-// Camera represent a remote camera to be controlled via the AW protocol
-type Camera struct {
+// CameraClient represent a remote camera to be controlled via the AW protocol
+type CameraClient struct {
 	// Remote is the IP address and port of the remote camera
 	// If the port is 0, the default port 80 is used.
 	Remote netip.AddrPort
@@ -31,7 +31,7 @@ type Camera struct {
 }
 
 // httpInit sets good defaults of the Http client for the quirks in AW protocol
-func (c *Camera) httpInit() {
+func (c *CameraClient) httpInit() {
 	if c.Http.CheckRedirect == nil {
 		c.Http.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
@@ -43,7 +43,7 @@ func (c *Camera) httpInit() {
 }
 
 // httpGet does an http.Get to the camera with the quirks of the AW protocol
-func (c *Camera) httpGet(path string, query string) (*http.Response, error) {
+func (c *CameraClient) httpGet(path string, query string) (*http.Response, error) {
 	c.httpOnce.Do(c.httpInit)
 	// The AW-RP50 just makes a one-liner HTTP/1.0 request, then proceeds to
 	// provide a Host header anyway filled with an incorrectly zero-padded IP.
@@ -74,7 +74,7 @@ func (c *Camera) httpGet(path string, query string) (*http.Response, error) {
 }
 
 // strCommand sends a command string to the camera over the http transport
-func (c *Camera) strCommand(cmd string) (string, error) {
+func (c *CameraClient) strCommand(cmd string) (string, error) {
 	var path string
 
 	// "guess" the endpoint based on the first character of the command
@@ -107,7 +107,7 @@ func (c *Camera) strCommand(cmd string) (string, error) {
 // AWCommand sends the passed AWRequest to the camera
 //
 // AW protocol error responses are returned as errors, not AWResponse objects.
-func (c *Camera) AWCommand(req AWRequest) (AWResponse, error) {
+func (c *CameraClient) AWCommand(req AWRequest) (AWResponse, error) {
 	cmd := req.packRequest()
 
 	ret, err := c.strCommand(cmd)
@@ -129,7 +129,7 @@ func (c *Camera) AWCommand(req AWRequest) (AWResponse, error) {
 }
 
 // AWBatch returns the command responses available at the camdata.html page.
-func (c *Camera) AWBatch() ([]AWResponse, error) {
+func (c *CameraClient) AWBatch() ([]AWResponse, error) {
 	data, err := c.httpGet("/live/camdata.html", "")
 	if err != nil {
 		return nil, &SystemError{err}
@@ -153,7 +153,7 @@ func (c *Camera) AWBatch() ([]AWResponse, error) {
 //
 // The returned listener already has an open a TCP listening port and ready
 // to accept notifications.
-func (c *Camera) Listener() (*NotifyListener, error) {
+func (c *CameraClient) Listener() (*NotifyListener, error) {
 	listener, err := net.ListenTCP("tcp4", &net.TCPAddr{})
 	if err != nil {
 		return nil, &SystemError{err}
@@ -164,7 +164,7 @@ func (c *Camera) Listener() (*NotifyListener, error) {
 	}, nil
 }
 
-var _ AWHandler = (*Camera)(nil)
+var _ AWHandler = (*CameraClient)(nil)
 
 type AWHandler interface {
 	AWCommand(AWRequest) (AWResponse, error)

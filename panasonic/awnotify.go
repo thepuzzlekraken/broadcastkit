@@ -108,7 +108,7 @@ func notifyPack(response string, session *NotifySession, date time.Time) []byte 
 type NotifyListener struct {
 	once sync.Once
 	lis  *net.TCPListener
-	cam  *Camera
+	cam  *CameraClient
 }
 
 // Start requests the camera to start sending notifications
