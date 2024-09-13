@@ -51,6 +51,56 @@ func Test_ResponseConsistency(t *testing.T) {
 	}
 }
 
+func Test_RequestConflicts(t *testing.T) {
+	seed := int64(48613)
+	for _, tt := range awRequestTable {
+		t.Run(reflect.TypeOf(tt.new()).Elem().Name(), func(t *testing.T) {
+			cmd1 := tt.new()
+			ref1 := reflect.TypeOf(cmd1).Elem()
+			sig1 := cmd1.requestSignature()
+			if sig1 != tt.sig {
+				t.Errorf("%v.requestSignature() = %v, want %v", cmd1, cmd1.requestSignature(), tt.sig)
+			}
+			str := generateMatch(tt.sig, seed)
+			cmd2 := newRequest(str)
+			ref2 := reflect.TypeOf(cmd2).Elem()
+			sig2 := cmd2.requestSignature()
+			if sig2 != tt.sig {
+				t.Errorf("%v.requestSignature() = %v, want %v", cmd2, cmd2.requestSignature(), tt.sig)
+			}
+			if ref1 != ref2 {
+				t.Errorf("conflict in tables for %s, %v != %v", str, ref1, ref2)
+			}
+		})
+		seed++
+	}
+}
+
+func Test_ResponseConflicts(t *testing.T) {
+	seed := int64(48613)
+	for _, tt := range awResponseTable {
+		t.Run(reflect.TypeOf(tt.new()).Elem().Name(), func(t *testing.T) {
+			cmd1 := tt.new()
+			ref1 := reflect.TypeOf(cmd1).Elem()
+			sig1 := cmd1.responseSignature()
+			if sig1 != tt.sig {
+				t.Errorf("%v.responseSignature() = %v, want %v", cmd1, cmd1.responseSignature(), tt.sig)
+			}
+			str := generateMatch(tt.sig, seed)
+			cmd2 := newResponse(str)
+			ref2 := reflect.TypeOf(cmd2).Elem()
+			sig2 := cmd2.responseSignature()
+			if sig2 != tt.sig {
+				t.Errorf("%v.responseSignature() = %v, want %v", cmd2, cmd2.responseSignature(), tt.sig)
+			}
+			if ref1 != ref2 {
+				t.Errorf("conflict in tables for %s, %v != %v", str, ref1, ref2)
+			}
+		})
+		seed++
+	}
+}
+
 func ExportedEqual(x, y any) bool {
 	v1 := reflect.ValueOf(x).Elem()
 	v2 := reflect.ValueOf(y).Elem()

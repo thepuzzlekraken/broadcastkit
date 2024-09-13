@@ -1142,13 +1142,13 @@ func (a *AWPresetRegister) Response() AWResponse {
 	return &AWPreset{Preset: a.Preset}
 }
 func (a *AWPresetRegister) requestSignature() string {
-	return "#P\x02\x02"
+	return "#M\x02\x02"
 }
 func (a *AWPresetRegister) unpackRequest(cmd string) {
 	a.Preset = toPreset(cmd[2:4])
 }
 func (a *AWPresetRegister) packRequest() string {
-	return "#P" + a.Preset.toWire()
+	return "#M" + a.Preset.toWire()
 }
 
 // AWPresetRecall commands the camera to obtain the specified preset position.
@@ -1886,6 +1886,7 @@ type AWOptionSwitch struct {
 }
 
 func init() { registerRequest(func() AWRequest { return &AWOptionSwitch{} }) }
+func init() { registerResponse(func() AWResponse { return &AWOptionSwitch{} }) }
 func (a *AWOptionSwitch) Acceptable() bool {
 	return a.Enable.Acceptable()
 }
