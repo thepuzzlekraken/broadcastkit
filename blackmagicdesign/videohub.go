@@ -9,13 +9,12 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 )
 
-// VideohubConn is a net.Conn style connection to a Blackmagic Videohub device.
+// VideohubSocket is a wrapper for the Blackmagic Videohub protocol.
 // Use VideohubDial to create a new connection.
-type VideohubConn struct {
-	conn  net.Conn
+type VideohubSocket struct {
+	Conn  io.ReadWriter
 	rlock sync.Mutex
 	scan  *bufio.Scanner
 }
@@ -33,11 +32,11 @@ type VideohubBlock interface {
 	dump(*bytes.Buffer)
 }
 
-// VideohubDial connects to a Videohub device at the given address.
+// DialVideohub connects to a Videohub device at the given address.
 // If port is not specified, the default 9990 is assumed.
 // This call supports TCP over IPv4 only. This is intended until Blackmagic
 // introduces IPv6 support in it's hardware.
-func VideohubDial(Addr string) (*VideohubConn, error) {
+func DialVideohub(Addr string) (*VideohubSocket, error) {
 	if !strings.Contains(Addr, ":") {
 		Addr = Addr + ":9990"
 	}
@@ -45,52 +44,26 @@ func VideohubDial(Addr string) (*VideohubConn, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to VideoHub: %w", err)
 	}
-	v := &VideohubConn{
-		conn: conn,
-		scan: bufio.NewScanner(conn),
+	v := &VideohubSocket{
+		Conn: conn,
 	}
-	v.scan.Split(blankSplitter)
 	return v, nil
-}
-
-// LocalAddr returns the local network address, if known.
-// See also: net.Conn.LocalAddr()
-func (c *VideohubConn) LocalAddr() net.Addr {
-	return c.conn.LocalAddr()
-}
-
-// RemoteAddr returns the remote network address, if known.
-// See also: net.Conn.RemoteAddr()
-func (c *VideohubConn) RemoteAddr() net.Addr {
-	return c.conn.RemoteAddr()
-}
-
-// SetWriteDeadline sets the deadline for future Write calls and any currently
-// blocked Write calls. See also: net.Conn.SetWriteDeadline()
-func (c *VideohubConn) SetWriteDeadline(t time.Time) error {
-	return c.conn.SetWriteDeadline(t)
 }
 
 // Write writes a VideohubBlock to the connection.
 // Write can be made to time-out by SetDeadline or SetWriteDeadline.
 // See also: net.Conn.Write()
-func (c *VideohubConn) Write(m VideohubBlock) error {
+func (c *VideohubSocket) Write(m VideohubBlock) error {
 	var buf bytes.Buffer
 	buf.WriteString(m.header())
 	buf.WriteByte('\n')
 	m.dump(&buf)
 	buf.WriteByte('\n')
-	_, err := c.conn.Write(buf.Bytes())
+	_, err := c.Conn.Write(buf.Bytes())
 	if err != nil {
 		return fmt.Errorf("VideohubConn.Write failed: %w", err)
 	}
 	return nil
-}
-
-// SetReadDeadline sets the deadline for future Read calls and any currently
-// blocked Read calls. See also: net.Conn.SetReadDeadline()
-func (c *VideohubConn) SetReadDeadline(t time.Time) error {
-	return c.conn.SetReadDeadline(t)
 }
 
 // Read reads a VideohubBlock from the connection.
@@ -99,9 +72,13 @@ func (c *VideohubConn) SetReadDeadline(t time.Time) error {
 // ACK and NAK messages are treated as complete blocks and returned immediately.
 // Concurrent calls to Read are safe, but the order of blocks is not guaranteed.
 // Read can be made to time-out by SetDeadline or SetReadDeadline.
-func (c *VideohubConn) Read() (VideohubBlock, error) {
+func (c *VideohubSocket) Read() (VideohubBlock, error) {
 	c.rlock.Lock()
 	defer c.rlock.Unlock()
+	if c.scan == nil {
+		c.scan = bufio.NewScanner(c.Conn)
+		c.scan.Split(blankSplitter)
+	}
 	for {
 		if !c.scan.Scan() {
 			err := c.scan.Err()
@@ -137,20 +114,6 @@ func (c *VideohubConn) Read() (VideohubBlock, error) {
 
 		return msg, nil
 	}
-}
-
-// SetDeadline sets the read and write deadlines associated with the connection.
-// See also: net.Conn.SetDeadline()
-func (c *VideohubConn) SetDeadline(t time.Time) error {
-	return c.conn.SetDeadline(t)
-}
-
-// Close will close the connection. Any blocked Read or Write operations will be
-// unblocked and return errors.
-// Internal buffers of VideohubConn are not freed until the garbage collection.
-// Make sure to clean-up references to VideohubConn after calling Close.
-func (c *VideohubConn) Close() error {
-	return c.conn.Close()
 }
 
 // newBlock returns the specific block struct for a given header
@@ -387,7 +350,7 @@ func (k *VideohubDeviceBlock) dump(b *bytes.Buffer) {
 		b.WriteByte('\n')
 	}
 	if k.DevicePresent == DevicePresentTrue {
-		b.WriteString("\nVideo inputs: ")
+		b.WriteString("Video inputs: ")
 		b.WriteString(strconv.Itoa(k.VideoInputs))
 		b.WriteString("\nVideo processing units: ")
 		b.WriteString(strconv.Itoa(k.VideoProcessingUnits))
