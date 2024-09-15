@@ -2,9 +2,9 @@ package panasonic
 
 // AWResponse is the interface implemented by all responses sent from a camera.
 //
-// To confirm success of an operation, the Ok() method can be used. For any
-// further information, the application has to type-assert the response to the
-// specific implementation.
+// For processing information, the application has to type-assert the response
+// to the specific implementation. Note that Responses returned may be AWError
+// anytime.
 type AWResponse interface {
 	// responseSignature returns the pattern of Panasonic string literals.
 	//
