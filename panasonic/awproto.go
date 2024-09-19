@@ -4,12 +4,14 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -27,7 +29,8 @@ type CameraClient struct {
 	// CheckRedirects is set func(...) error { return http.ErrUseLastResponse }
 	// Timeout is set to 3 seconds
 	Http     http.Client
-	httpOnce sync.Once
+	httpOnce sync.Once     // track http initialization
+	dummyCtr atomic.Uint64 // source for dummy cache-disabling numbers
 }
 
 // httpInit sets good defaults of the Http client for the quirks in AW protocol
@@ -40,6 +43,7 @@ func (c *CameraClient) httpInit() {
 	if c.Http.Timeout == 0 {
 		c.Http.Timeout = networkTimeout
 	}
+	c.dummyCtr.Store(rand.Uint64())
 }
 
 // httpGet does an http.Get to the camera with the quirks of the AW protocol
@@ -147,6 +151,38 @@ func (c *CameraClient) AWBatch() ([]AWResponse, error) {
 		return nil, &SystemError{err}
 	}
 	return res, nil
+}
+
+// Screenshot returns a JPEG-encoded still image from the camera
+//
+// You can specify an image width in pixels as resolution, which may be honored
+// on a best-effort basis. The returned image size may be different.
+func (c *CameraClient) Screenshot(resolution int) ([]byte, error) {
+	// The page value is defined by the documentation to defeat caches. Probably not necessary in practice.
+	// httpInit is called here to ensure dummyCtr is initialized to a pseudo-random value.
+	c.httpOnce.Do(c.httpInit)
+	query := "resolution=" + strconv.Itoa(resolution) + "&page=" + strconv.FormatUint(c.dummyCtr.Add(1), 10)
+
+	data, err := c.httpGet("/cgi-bin/camera", query)
+	if err != nil {
+		return nil, &SystemError{err}
+	}
+	defer data.Body.Close()
+
+	if data.StatusCode != http.StatusOK {
+		return nil, &SystemError{fmt.Errorf("http status code: %d (expected %d)", data.StatusCode, http.StatusOK)}
+	}
+
+	if ct := data.Header.Get("Content-Type"); ct != "image/jpeg" {
+		return nil, &SystemError{fmt.Errorf("unexpected content type: %s", ct)}
+	}
+
+	img, err := io.ReadAll(data.Body)
+	if err != nil {
+		return nil, &SystemError{err}
+	}
+
+	return img, nil
 }
 
 // Listener returns a listener for the AW notification protocol
