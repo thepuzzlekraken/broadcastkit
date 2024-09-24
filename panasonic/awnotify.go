@@ -121,7 +121,7 @@ func (l *NotifyListener) Start() error {
 // start is the actual implementation of the Start() method
 func (l *NotifyListener) start() error {
 	port := netip.MustParseAddrPort(l.lis.Addr().String()).Port()
-	res, err := l.cam.httpGet("/cgi-bin/event", "connect=start&my_port="+strconv.Itoa(int(port))+"&uid=0")
+	res, err := l.cam.httpGet("/cgi-bin/event", "connect=start&my_port="+strconv.Itoa(int(port))+"&uid=0", nil)
 	if err != nil {
 		return &SystemError{err}
 	}
@@ -135,7 +135,7 @@ func (l *NotifyListener) start() error {
 // Stop requests the camera to stop sending notifications
 func (l *NotifyListener) Stop() error {
 	port := netip.MustParseAddrPort(l.lis.Addr().String()).Port()
-	res, err := l.cam.httpGet("/cgi-bin/event", "connect=start&my_port="+strconv.Itoa(int(port))+"&uid=0")
+	res, err := l.cam.httpGet("/cgi-bin/event", "connect=start&my_port="+strconv.Itoa(int(port))+"&uid=0", nil)
 	if err != nil {
 		return &SystemError{err}
 	}

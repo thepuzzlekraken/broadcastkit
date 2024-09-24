@@ -2,6 +2,7 @@ package panasonic
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"math/rand/v2"
@@ -47,7 +48,7 @@ func (c *CameraClient) httpInit() {
 }
 
 // httpGet does an http.Get to the camera with the quirks of the AW protocol
-func (c *CameraClient) httpGet(path string, query string) (*http.Response, error) {
+func (c *CameraClient) httpGet(path string, query string, user *url.Userinfo) (*http.Response, error) {
 	c.httpOnce.Do(c.httpInit)
 	// The AW-RP50 just makes a one-liner HTTP/1.0 request, then proceeds to
 	// provide a Host header anyway filled with an incorrectly zero-padded IP.
@@ -63,6 +64,7 @@ func (c *CameraClient) httpGet(path string, query string) (*http.Response, error
 	return c.Http.Do(&http.Request{
 		Method: "GET",
 		URL: &url.URL{
+			User:     user,
 			Scheme:   "http",
 			Host:     host,
 			Path:     path,
@@ -90,7 +92,7 @@ func (c *CameraClient) strCommand(cmd string) (string, error) {
 
 	// Panasonic panels do NOT urlencode the command even though it contains #
 	// Since the specification permits encoding, we do it for http compliance.
-	res, err := c.httpGet(path, "cmd="+url.QueryEscape(cmd)+"&res=1")
+	res, err := c.httpGet(path, "cmd="+url.QueryEscape(cmd)+"&res=1", nil)
 	if err != nil {
 		return "", err
 	}
@@ -134,7 +136,7 @@ func (c *CameraClient) AWCommand(req AWRequest) (AWResponse, error) {
 
 // AWBatch returns the command responses available at the camdata.html page.
 func (c *CameraClient) AWBatch() ([]AWResponse, error) {
-	data, err := c.httpGet("/live/camdata.html", "")
+	data, err := c.httpGet("/live/camdata.html", "", nil)
 	if err != nil {
 		return nil, &SystemError{err}
 	}
@@ -163,7 +165,7 @@ func (c *CameraClient) Screenshot(resolution int) ([]byte, error) {
 	c.httpOnce.Do(c.httpInit)
 	query := "resolution=" + strconv.Itoa(resolution) + "&page=" + strconv.FormatUint(c.dummyCtr.Add(1), 10)
 
-	data, err := c.httpGet("/cgi-bin/camera", query)
+	data, err := c.httpGet("/cgi-bin/camera", query, nil)
 	if err != nil {
 		return nil, &SystemError{err}
 	}
@@ -183,6 +185,49 @@ func (c *CameraClient) Screenshot(resolution int) ([]byte, error) {
 	}
 
 	return img, nil
+}
+
+func (c *CameraClient) GetTitle() (string, error) {
+	// Using the AWBatch endpoint because it does not require authentication.
+	batch, err := c.AWBatch()
+	if err != nil {
+		return "", err
+	}
+	for _, res := range batch {
+		if t, ok := res.(*AWTitle); ok {
+			return t.Title, nil
+		}
+	}
+	return "", fmt.Errorf("camera did not report title")
+}
+
+var defaultUserPassword = url.UserPassword("admin", "12345")
+
+func (c *CameraClient) SetTitle(title string, user *url.Userinfo) error {
+	if user == nil {
+		user = defaultUserPassword
+	}
+	res, err := c.httpGet("/cgi-bin/set_basic", "cam_title="+url.QueryEscape(title), user)
+	if err != nil {
+		return &SystemError{err}
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return &SystemError{fmt.Errorf("http status code: %d (expected %d)", res.StatusCode, http.StatusOK)}
+	}
+	compBuf := make([]byte, 10+len(title)+2)
+	copy(compBuf, "cam_title=")
+	copy(compBuf[10:], title)
+	copy(compBuf[10+len(title):], "\r\n")
+	checkBuf := make([]byte, len(compBuf))
+	_, err = res.Body.Read(checkBuf)
+	if err != nil {
+		return &SystemError{err}
+	}
+	if !bytes.Equal(compBuf, checkBuf) {
+		return fmt.Errorf("unexpected response from camera: %s", string(checkBuf))
+	}
+	return nil
 }
 
 // Listener returns a listener for the AW notification protocol
