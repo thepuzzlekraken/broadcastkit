@@ -1129,24 +1129,6 @@ func (a *AWPreset) packResponse() string {
 	return "s" + a.Preset.toWire()
 }
 
-// AWPresetReplay is given on the notification channel only, indicating the
-// number of a sucessfully recalled preset.
-type AWPresetReplay struct {
-	Preset Preset
-}
-
-func init() { registerResponse(func() AWResponse { return &AWPreset{} }) }
-
-func (a *AWPresetReplay) responseSignature() string {
-	return "q\x02\x02"
-}
-func (a *AWPresetReplay) unpackResponse(cmd string) {
-	a.Preset = toPreset(cmd[1:3])
-}
-func (a *AWPresetReplay) packResponse() string {
-	return "q" + a.Preset.toWire()
-}
-
 // AWPresetRegister saves the current camera position as a preset.
 type AWPresetRegister struct {
 	Preset Preset
