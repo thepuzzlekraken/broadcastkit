@@ -342,6 +342,7 @@ func (c *CameraServer) wrapAW(hash bool, w http.ResponseWriter, r *http.Request)
 	awres, err := c.AWHandler.AWCommand(awcmd)
 	if err != nil {
 		http.Error(w, "Bad Gateway", http.StatusBadGateway)
+		return
 	}
 	w.Header().Set("Content-Type", "text/plain")
 	w.Write([]byte(awres.packResponse()))
@@ -402,6 +403,7 @@ func (c *CameraServer) serveCamData(w http.ResponseWriter, r *http.Request) {
 	b, err := c.AWHandler.AWBatch()
 	if err != nil {
 		http.Error(w, "Bad Gateway", http.StatusBadGateway)
+		return
 	}
 	w.Header().Add("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
