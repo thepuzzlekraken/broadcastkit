@@ -122,11 +122,11 @@ func (c *CameraClient) AWCommand(req AWRequest) (AWResponse, error) {
 	}
 
 	res := req.Response()
-	if sig := res.responseSignature(); !match(sig, ret) {
+	if sig := res.responseSignature(); match(sig, ret) {
+		res.unpackResponse(ret)
+	} else {
 		res = newResponse(ret)
 	}
-
-	res.unpackResponse(ret)
 
 	if err, ok := res.(*AWError); ok {
 		return nil, err
@@ -312,16 +312,16 @@ func (c *CameraServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // servePtz is the /cgi-bin/aw_ptz endpoint handler
 func (c *CameraServer) servePtz(w http.ResponseWriter, r *http.Request) {
-	c.wrapAW(true, w, r)
+	c.wrapAW(quirkPtz, w, r)
 }
 
 // serveCam is the /cgi-bin/aw_cam endpoint handler
 func (c *CameraServer) serveCam(w http.ResponseWriter, r *http.Request) {
-	c.wrapAW(false, w, r)
+	c.wrapAW(quirkCamera, w, r)
 }
 
 // wrapAW does the http dance around AW commands
-func (c *CameraServer) wrapAW(hash bool, w http.ResponseWriter, r *http.Request) {
+func (c *CameraServer) wrapAW(mode quirkMode, w http.ResponseWriter, r *http.Request) {
 	// Generate a "Bad Request" for missing parameters
 	qry := r.URL.Query()
 	if qry.Get("res") != "1" {
@@ -333,8 +333,8 @@ func (c *CameraServer) wrapAW(hash bool, w http.ResponseWriter, r *http.Request)
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
-	// Generate a "Bad Request" for confused endpoints
-	if (strcmd[0] == '#') != hash {
+	// Generate a "Bad Request" for confused endpoints (only quirkPtz has #)
+	if (strcmd[0] == '#') != (mode == quirkPtz) {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
@@ -343,6 +343,9 @@ func (c *CameraServer) wrapAW(hash bool, w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		http.Error(w, "Bad Gateway", http.StatusBadGateway)
 		return
+	}
+	if q, ok := awres.(awQuirkedPacking); ok {
+		awres = q.packingQuirk(mode)
 	}
 	w.Header().Set("Content-Type", "text/plain")
 	w.Write([]byte(awres.packResponse()))
@@ -407,8 +410,11 @@ func (c *CameraServer) serveCamData(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Add("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
-	for _, r := range b {
-		w.Write([]byte(r.packResponse()))
+	for _, res := range b {
+		if q, ok := res.(awQuirkedPacking); ok {
+			res = q.packingQuirk(quirkBatch)
+		}
+		w.Write([]byte(res.packResponse()))
 		w.Write([]byte("\r\n"))
 	}
 }

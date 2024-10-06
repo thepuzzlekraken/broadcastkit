@@ -1,6 +1,11 @@
 package panasonic
 
-import "strings"
+import (
+	"slices"
+	"strconv"
+	"strings"
+	"time"
+)
 
 // PowerSwitch represent the status of the virtual power switch
 type PowerSwitch byte
@@ -2600,4 +2605,456 @@ func (a *AWTitle) unpackResponse(cmd string) {
 }
 func (a *AWTitle) packResponse() string {
 	return "TITLE:" + a.Title
+}
+
+type AWModelName struct {
+	ModelName string
+}
+
+func init() { registerResponse(func() AWResponse { return &AWModelName{} }) }
+
+func (a *AWModelName) responseSignature() string {
+	return "OID:\x7F"
+}
+func (a *AWModelName) unpackResponse(cmd string) {
+	a.ModelName = cmd[4:]
+}
+func (a *AWModelName) packResponse() string {
+	if len(a.ModelName) == 0 {
+		return "OID: "
+	}
+	return "OID:" + a.ModelName
+}
+
+type AWModelNameQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWModelNameQuery{} }) }
+func (a *AWModelNameQuery) Acceptable() bool {
+	return true
+}
+func (a *AWModelNameQuery) Response() AWResponse {
+	return &AWModelName{}
+}
+func (a *AWModelNameQuery) requestSignature() string {
+	return "QID"
+}
+func (a *AWModelNameQuery) unpackRequest(_ string) {}
+func (a *AWModelNameQuery) packRequest() string {
+	return "QID"
+}
+
+type AWCGITime struct {
+	Time time.Duration
+}
+
+func init() { registerResponse(func() AWResponse { return &AWCGITime{} }) }
+func (a *AWCGITime) responseSignature() string {
+	l := 10
+	ms := a.Time.Milliseconds()
+	if ms >= 10 {
+		l++
+	}
+	if ms >= 100 {
+		l++
+	}
+	return "CGI_TIME:\x02\x02\x02"[:l]
+}
+func (a *AWCGITime) packResponse() string {
+	return "CGI_TIME:" + strconv.FormatInt(a.Time.Milliseconds(), 10)
+}
+func (a *AWCGITime) unpackResponse(cmd string) {
+	num := dec2int(cmd[9:])
+	a.Time = time.Duration(num) * time.Millisecond
+}
+
+type Format int
+
+const (
+	F720p60      Format = 0x0
+	F720p59      Format = 0x1
+	F720p50      Format = 0x2
+	F1080i59     Format = 0x4
+	F1080i50     Format = 0x5
+	F1080psf29   Format = 0x7
+	F1080psf25   Format = 0x8
+	F1080psf23   Format = 0xA
+	F480i59      Format = 0xB
+	F576i50      Format = 0xD
+	F1080p59     Format = 0x10
+	F1080p50     Format = 0x11
+	F480p59      Format = 0x12
+	F576p50      Format = 0x13
+	F1080p29     Format = 0x14
+	F1080p25     Format = 0x15
+	F1080p23     Format = 0x16
+	F2160p29     Format = 0x17
+	F2160p25     Format = 0x18
+	F2160p59     Format = 0x19
+	F2160p50     Format = 0x1A
+	F2160p23     Format = 0x1B
+	F2160psf29   Format = 0x1C
+	F2160psf25   Format = 0x1D
+	F2160psf23   Format = 0x1E
+	F2160p60     Format = 0x1F
+	F1080p60     Format = 0x20
+	F2160p24     Format = 0x21
+	F1080p24     Format = 0x22
+	F1080p2399   Format = 0x23
+	F1080i59crop Format = 0x44
+	F1080i50crop Format = 0x45
+	F1080p59crop Format = 0x50
+	F1080p50crop Format = 0x51
+	//fBitSet             = 0x1100000000001100000000000000000000000000000000111111111111111111110010110110110111
+)
+
+var validFormats = [...]Format{
+	F720p60,
+	F720p59,
+	F720p50,
+	F1080i59,
+	F1080i50,
+	F1080psf29,
+	F1080psf25,
+	F1080psf23,
+	F480i59,
+	F576i50,
+	F1080p59,
+	F1080p50,
+	F480p59,
+	F576p50,
+	F1080p29,
+	F1080p25,
+	F1080p23,
+	F2160p29,
+	F2160p25,
+	F2160p59,
+	F2160p50,
+	F2160p23,
+	F2160psf29,
+	F2160psf25,
+	F2160psf23,
+	F2160p60,
+	F1080p60,
+	F2160p24,
+	F1080p24,
+	F1080p2399,
+	F1080i59crop,
+	F1080i50crop,
+	F1080p59crop,
+	F1080p50crop,
+}
+
+func (f Format) Acceptable() bool {
+	if f < 0x00 && f > 0xFF {
+		return false
+	}
+	return slices.Contains(validFormats[:], f)
+}
+
+type AWFormat struct {
+	quirk  bool
+	Format Format
+}
+
+var _ awQuirkedPacking = (*AWFormat)(nil)
+
+func init() { registerRequest(func() AWRequest { return &AWFormat{} }) }
+func init() { registerResponse(func() AWResponse { return &AWFormat{} }) }
+func init() { registerResponse(func() AWResponse { return &AWFormat{quirk: true} }) }
+
+func (a *AWFormat) Acceptable() bool {
+	return a.Format.Acceptable()
+}
+
+func (a *AWFormat) Response() AWResponse {
+	return a
+}
+
+func (a *AWFormat) requestSignature() string {
+	return "OSA:87:\x01\x01"
+}
+
+func (a *AWFormat) unpackRequest(cmd string) {
+	a.Format = Format(hex2int(cmd[7:9]))
+}
+
+func (a *AWFormat) packRequest() string {
+	return "OSA:87:" + int2hex(int(a.Format), 2)
+}
+
+func (a *AWFormat) responseSignature() string {
+	if a.quirk {
+		return "OSA:87:0x\x01\x01"
+	}
+	return "OSA:87:\x01\x01"
+}
+func (a *AWFormat) unpackResponse(cmd string) {
+	if a.quirk {
+		a.Format = Format(hex2int(cmd[9:11]))
+		return
+	}
+	a.Format = Format(hex2int(cmd[7:9]))
+}
+func (a *AWFormat) packResponse() string {
+	if a.quirk {
+		return "OSA:87:0x" + int2hex(int(a.Format), 2)
+	}
+	return "OSA:87:" + int2hex(int(a.Format), 2)
+}
+func (a *AWFormat) packingQuirk(m quirkMode) AWResponse {
+	c := *a
+	c.quirk = (m == quirkBatch)
+	return &c
+}
+
+type AWFormatQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWFormatQuery{} }) }
+func (a *AWFormatQuery) Acceptable() bool {
+	return true
+}
+func (a *AWFormatQuery) Response() AWResponse {
+	return &AWFormat{}
+}
+func (a *AWFormatQuery) requestSignature() string {
+	return "QSA:87"
+}
+func (a *AWFormatQuery) unpackRequest(_ string) {}
+func (a *AWFormatQuery) packRequest() string {
+	return "QSA:87"
+}
+
+type AWSDIFormat struct {
+	quirk  bool
+	Format Format
+}
+
+var _ awQuirkedPacking = (*AWSDIFormat)(nil)
+
+func init() { registerRequest(func() AWRequest { return &AWSDIFormat{} }) }
+func init() { registerResponse(func() AWResponse { return &AWSDIFormat{} }) }
+func init() { registerResponse(func() AWResponse { return &AWSDIFormat{quirk: true} }) }
+
+func (a *AWSDIFormat) Acceptable() bool {
+	return a.Format.Acceptable()
+}
+
+func (a *AWSDIFormat) Response() AWResponse {
+	return a
+}
+
+func (a *AWSDIFormat) requestSignature() string {
+	return "OSD:B9:\x01\x01"
+}
+
+func (a *AWSDIFormat) unpackRequest(cmd string) {
+	a.Format = Format(hex2int(cmd[7:9]))
+}
+
+func (a *AWSDIFormat) packRequest() string {
+	return "OSD:B9:" + int2hex(int(a.Format), 2)
+}
+
+func (a *AWSDIFormat) responseSignature() string {
+	if a.quirk {
+		return "OSD:B9:0x\x01\x01"
+	}
+	return "OSD:B9:\x01\x01"
+}
+func (a *AWSDIFormat) unpackResponse(cmd string) {
+	if a.quirk {
+		a.Format = Format(hex2int(cmd[9:11]))
+		return
+	}
+	a.Format = Format(hex2int(cmd[7:9]))
+}
+func (a *AWSDIFormat) packResponse() string {
+	if a.quirk {
+		return "OSD:B9:0x" + int2hex(int(a.Format), 2)
+	}
+	return "OSD:B9:" + int2hex(int(a.Format), 2)
+}
+func (a *AWSDIFormat) packingQuirk(m quirkMode) AWResponse {
+	c := *a
+	c.quirk = (m == quirkBatch)
+	return &c
+}
+
+type AWSDIFormatQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWSDIFormatQuery{} }) }
+func (a *AWSDIFormatQuery) Acceptable() bool {
+	return true
+}
+func (a *AWSDIFormatQuery) Response() AWResponse {
+	return &AWSDIFormat{}
+}
+func (a *AWSDIFormatQuery) requestSignature() string {
+	return "QSD:B9"
+}
+func (a *AWSDIFormatQuery) unpackRequest(_ string) {}
+func (a *AWSDIFormatQuery) packRequest() string {
+	return "QSD:B9"
+}
+
+// Decibel is a logaritmic value from 0 to 121 in dB scale.
+//
+// The maximum value is camera-dependent, -1 is understood as "none/auto"
+type Decibel int
+
+func (d Decibel) toWire() string {
+	if d == -1 {
+		d = 0x80
+	}
+	return int2hex(int(d), 2)
+}
+func toDecibel(s string) Decibel {
+	d := Decibel(hex2int(s[0:2]))
+	if d == 0x80 {
+		d = -1
+	}
+	return d
+}
+func (d Decibel) Acceptable() bool {
+	return d >= -1 && d <= 121
+}
+
+// AWGain sets the sensor gain level
+type AWGain struct {
+	quirk bool
+	Gain  Decibel
+}
+
+var _ awQuirkedPacking = (*AWGain)(nil)
+
+func init() { registerRequest(func() AWRequest { return &AWGain{} }) }
+func init() { registerResponse(func() AWResponse { return &AWGain{} }) }
+func init() { registerResponse(func() AWResponse { return &AWGain{quirk: true} }) }
+func (a *AWGain) Acceptable() bool {
+	return a.Gain.Acceptable()
+}
+func (a *AWGain) Response() AWResponse {
+	return a
+}
+func (a *AWGain) requestSignature() string {
+	return "OGU:\x01\x01"
+}
+func (a *AWGain) unpackRequest(cmd string) {
+	a.Gain = toDecibel(cmd[4:6])
+}
+func (a *AWGain) packRequest() string {
+	return "OGU:" + a.Gain.toWire()
+}
+func (a *AWGain) responseSignature() string {
+	if a.quirk {
+		return "OGU:0x\x01\x01"
+	}
+	return "OGU:\x01\x01"
+}
+func (a *AWGain) unpackResponse(cmd string) {
+	if a.quirk {
+		a.Gain = toDecibel(cmd[6:8])
+		return
+	}
+	a.Gain = toDecibel(cmd[4:6])
+}
+func (a *AWGain) packResponse() string {
+	if a.quirk {
+		return "OGU:0x" + a.Gain.toWire()
+	}
+	return "OGU:" + a.Gain.toWire()
+}
+func (a *AWGain) packingQuirk(m quirkMode) AWResponse {
+	c := *a
+	c.quirk = (m == quirkBatch)
+	return &c
+}
+
+type AWGainQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWGainQuery{} }) }
+func (a *AWGainQuery) Acceptable() bool {
+	return true
+}
+func (a *AWGainQuery) Response() AWResponse {
+	return &AWGain{}
+}
+func (a *AWGainQuery) requestSignature() string {
+	return "QGU"
+}
+func (a *AWGainQuery) unpackRequest(_ string) {}
+func (a *AWGainQuery) packRequest() string {
+	return "QGU"
+}
+
+// AWPedestal sets the sensor pedestal value between -30 and +30
+// It is displayed on the UI in steps of 3, so +30 as +10, +9 as +3, etc.
+type AWPedestal struct {
+	quirk    bool
+	Pedestal int
+}
+
+const pedestalZero = 0x1E
+
+var _ awQuirkedPacking = (*AWPedestal)(nil)
+
+func init() { registerRequest(func() AWRequest { return &AWPedestal{} }) }
+func init() { registerResponse(func() AWResponse { return &AWPedestal{} }) }
+func init() { registerResponse(func() AWResponse { return &AWPedestal{quirk: true} }) }
+func (a *AWPedestal) Acceptable() bool {
+	return a.Pedestal >= -pedestalZero && a.Pedestal <= pedestalZero
+}
+func (a *AWPedestal) Response() AWResponse {
+	return a
+}
+func (a *AWPedestal) requestSignature() string {
+	return "OTD:\x01\x01"
+}
+func (a *AWPedestal) unpackRequest(cmd string) {
+	a.Pedestal = hex2int(cmd[4:6]) - pedestalZero
+}
+func (a *AWPedestal) packRequest() string {
+	return "OTD:" + int2hex(a.Pedestal+pedestalZero, 2)
+}
+func (a *AWPedestal) responseSignature() string {
+	if a.quirk {
+		return "OTD:0x\x01\x01"
+	}
+	return "OTD:\x01\x01"
+}
+func (a *AWPedestal) unpackResponse(cmd string) {
+	if a.quirk {
+		a.Pedestal = hex2int(cmd[6:8]) - pedestalZero
+		return
+	}
+	a.Pedestal = hex2int(cmd[4:6]) - pedestalZero
+}
+func (a *AWPedestal) packResponse() string {
+	if a.quirk {
+		return "OTD:0x" + int2hex(a.Pedestal+pedestalZero, 2)
+	}
+	return "OTD:" + int2hex(a.Pedestal+pedestalZero, 2)
+}
+func (a *AWPedestal) packingQuirk(m quirkMode) AWResponse {
+	c := *a
+	c.quirk = (m == quirkBatch)
+	return &c
+}
+
+// AWPedestalQuery requests the current AWPedestal setting.
+type AWPedestalQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return &AWPedestalQuery{} }) }
+func (a *AWPedestalQuery) Acceptable() bool {
+	return true
+}
+func (a *AWPedestalQuery) Response() AWResponse {
+	return &AWPedestal{}
+}
+func (a *AWPedestalQuery) requestSignature() string {
+	return "QTD"
+}
+func (a *AWPedestalQuery) unpackRequest(_ string) {}
+func (a *AWPedestalQuery) packRequest() string {
+	return "QTD"
 }

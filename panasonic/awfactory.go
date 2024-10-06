@@ -58,6 +58,21 @@ type AWRequest interface {
 	packRequest() string
 }
 
+// awQuirkedPack is implemented by an AWResponse when it needs to be aware of
+// it's context to produce a valid packing or unpacking.
+type awQuirkedPacking interface {
+	packingQuirk(mode quirkMode) AWResponse
+}
+
+type quirkMode int
+
+const (
+	quirkBatch  quirkMode = iota // set when in a batch reply
+	quirkNotify                  // set when in a notification
+	quirkCamera                  // set when in an aw_cam endpoint
+	quirkPtz                     // set when in an aw_ptz endpoint
+)
+
 // AWUknownResponse is a placeholder implementation for AWResponse.
 //
 // Used when a non-error response is not recognized by this library. It is not

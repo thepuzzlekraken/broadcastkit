@@ -370,6 +370,9 @@ func sendTCP(b []byte, dst netip.AddrPort) error {
 //
 // It retries up to 3 times and returns the error of the last try.
 func (s *NotifySession) Send(res AWResponse) error {
+	if q, ok := res.(awQuirkedPacking); ok {
+		res = q.packingQuirk(quirkNotify)
+	}
 	b := notifyPack(res.packResponse(), s, time.Now())
 	var err error
 	for i := 0; i < 3; i++ {
