@@ -340,6 +340,10 @@ func (c *CameraServer) wrapAW(mode quirkMode, w http.ResponseWriter, r *http.Req
 	}
 	awcmd := newRequest(strcmd)
 	awres, err := c.AWHandler.AWCommand(awcmd)
+	if errres, ok := err.(*AWError); ok {
+		awres = errres
+		err = nil
+	}
 	if err != nil {
 		http.Error(w, "Bad Gateway", http.StatusBadGateway)
 		return
