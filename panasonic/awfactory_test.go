@@ -241,6 +241,10 @@ func TestAWRequest(t *testing.T) {
 			if !match(sig, tt.reqStr) {
 				t.Errorf("match(%v,%v) = false, want true", sig, tt.reqStr)
 			}
+			new := newRequest(tt.reqStr)
+			if !ExportedEqual(new, tt.request) {
+				t.Errorf("unpackRequest(%v) -> %v, want %v", tt.reqStr, new, tt.request)
+			}
 			acceptable := tt.request.Acceptable()
 			if acceptable != tt.acceptable {
 				t.Errorf("%v.Acceptable() = %v, want %v", tt.request, acceptable, tt.acceptable)
@@ -249,15 +253,54 @@ func TestAWRequest(t *testing.T) {
 			if !ExportedEqual(response, tt.response) {
 				t.Errorf("Response() = %v, want %v", response, tt.response)
 			}
-
-			new := reflect.New(reflect.TypeOf(tt.request)).Interface().(AWRequest)
-			new = new.unpackRequest(tt.reqStr)
-			if !ExportedEqual(new, tt.request) {
-				t.Errorf("unpackRequest(%v) -> %v, want %v", tt.reqStr, new, tt.request)
-			}
 			pack := new.packRequest()
 			if pack != tt.reqStr {
 				t.Errorf("%v.packRequest() = %v, want %v", tt.request, pack, tt.reqStr)
+			}
+		})
+	}
+}
+
+func TestAWResponse(t *testing.T) {
+	tests := []struct {
+		name     string
+		resStr   string
+		response AWResponse
+	}{
+		{
+			name:     "Power On",
+			resStr:   "p1",
+			response: AWPower{Power: PowerOn},
+		},
+		{
+			name:     "Power Off",
+			resStr:   "p0",
+			response: AWPower{Power: PowerStandby},
+		},
+		{
+			name:     "Install Position Desktop",
+			resStr:   "iNS0",
+			response: AWInstall{Position: DesktopPosition},
+		},
+		{
+			name:     "Install Postion Hanging",
+			resStr:   "iNS1",
+			response: AWInstall{Position: HangingPosition},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%s %s", tt.name, tt.resStr), func(t *testing.T) {
+			sig := tt.response.responseSignature()
+			if !match(sig, tt.resStr) {
+				t.Errorf("match(%v,%v) = false, want true", sig, tt.resStr)
+			}
+			new := newResponse(tt.resStr)
+			if !ExportedEqual(new, tt.response) {
+				t.Errorf("newResponse(%v) -> %v, want %v", tt.resStr, new, tt.response)
+			}
+			pack := new.packResponse()
+			if pack != tt.resStr {
+				t.Errorf("%v.packResponse() = %v, want %v", tt.response, pack, tt.resStr)
 			}
 		})
 	}

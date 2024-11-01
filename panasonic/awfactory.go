@@ -161,7 +161,7 @@ func newRequest(cmd string) AWRequest {
 	for _, e := range awRequestTable {
 		if match(e.sig, cmd) {
 			req := e.new()
-			req.unpackRequest(cmd)
+			req = req.unpackRequest(cmd)
 			return req
 		}
 	}
@@ -177,7 +177,7 @@ func newResponse(cmd string) AWResponse {
 	for _, e := range awResponseTable {
 		if match(e.sig, cmd) {
 			res := e.new()
-			res.unpackResponse(cmd)
+			res = res.unpackResponse(cmd)
 			return res
 		}
 	}
