@@ -128,7 +128,7 @@ func (c *CameraClient) AWCommand(req AWRequest) (AWResponse, error) {
 		res = newResponse(ret)
 	}
 
-	if err, ok := res.(*AWError); ok {
+	if err, ok := res.(AWError); ok {
 		return nil, err
 	}
 	return res, nil
@@ -194,7 +194,7 @@ func (c *CameraClient) GetTitle() (string, error) {
 		return "", err
 	}
 	for _, res := range batch {
-		if t, ok := res.(*AWTitle); ok {
+		if t, ok := res.(AWTitle); ok {
 			return t.Title, nil
 		}
 	}
@@ -340,7 +340,7 @@ func (c *CameraServer) wrapAW(mode quirkMode, w http.ResponseWriter, r *http.Req
 	}
 	awcmd := newRequest(strcmd)
 	awres, err := c.AWHandler.AWCommand(awcmd)
-	if errres, ok := err.(*AWError); ok {
+	if errres, ok := err.(AWError); ok {
 		awres = errres
 		err = nil
 	}

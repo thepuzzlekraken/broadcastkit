@@ -47,9 +47,8 @@ func TestAWPresetEntriesUnpackResponse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a := &AWPresetEntries{}
-			a.unpackResponse(tt.cmd)
-			if !reflect.DeepEqual(a, &tt.expected) {
+			a := AWPresetEntries{}.unpackResponse(tt.cmd)
+			if !reflect.DeepEqual(a, tt.expected) {
 				t.Errorf("unpackResponse() = %v, want %v", a, tt.expected)
 			}
 		})

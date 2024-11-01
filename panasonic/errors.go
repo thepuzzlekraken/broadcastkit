@@ -21,7 +21,7 @@ type AWError struct {
 
 // Error implements the error interface
 // This is intended for the ability to return Panasonic errors as go error
-func (e *AWError) Error() string {
+func (e AWError) Error() string {
 	switch e.No {
 	case AWErrUnsupported:
 		return fmt.Sprintf("unsupported AW command (%s)", e.Flag)
@@ -34,17 +34,18 @@ func (e *AWError) Error() string {
 	}
 }
 
-func (e *AWError) responseSignature() string {
+func (e AWError) responseSignature() string {
 	sig := "\x03R\x02:\x7F"
 	// return the correct-length pattern depending on flag length
 	return sig[0:min(4+len(e.Flag), 5)]
 }
-func (e *AWError) unpackResponse(s string) {
+func (e AWError) unpackResponse(s string) AWResponse {
 	e.cap = s[0] == 'E'
 	e.No = AWErrNo(dec2int(s[2:3]))
 	e.Flag = s[4:]
+	return e
 }
-func (e *AWError) packResponse() string {
+func (e AWError) packResponse() string {
 	if e.cap {
 		return "ER" + int2dec(int(e.No), 1) + ":" + e.Flag
 	}
@@ -52,8 +53,8 @@ func (e *AWError) packResponse() string {
 }
 func init() {
 	// The \xF7 matches any character of 1+ length, but error may have 0
-	registerResponse(func() AWResponse { return &AWError{Flag: ""} })
-	registerResponse(func() AWResponse { return &AWError{Flag: " "} })
+	registerResponse(func() AWResponse { return AWError{Flag: ""} })
+	registerResponse(func() AWResponse { return AWError{Flag: " "} })
 }
 
 // NewAWError creates an AWError as a Panasonic device would.

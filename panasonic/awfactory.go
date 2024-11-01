@@ -17,7 +17,7 @@ type AWResponse interface {
 	// It is the responsibility of the caller to ensure pattern match before
 	// a call. Behavior is undefined if the passed string does not match the
 	// signature possibly resulting in panic or invalid command data!
-	unpackResponse(string)
+	unpackResponse(string) AWResponse
 	// packResponse returns the Panasonic string representation of the response.
 	//
 	// The returned string is guaranteed to match the responseSignature pattern.
@@ -50,7 +50,7 @@ type AWRequest interface {
 	//
 	// The passed string must match the requestSignature() pattern. Limitations
 	// are the same as AWResponse.unpackResponse().
-	unpackRequest(string)
+	unpackRequest(string) AWRequest
 	// packRequest returns the Panasonic string representation of the request.
 	//
 	// The returned string is guaranteed to match the resquestSignature()
@@ -82,11 +82,13 @@ type AWUnknownResponse struct {
 	text string
 }
 
-func (a *AWUnknownResponse) responseSignature() string {
+func (a AWUnknownResponse) responseSignature() string {
 	return a.text
 }
-func (a *AWUnknownResponse) unpackResponse(_ string) {}
-func (a *AWUnknownResponse) packResponse() string {
+func (a AWUnknownResponse) unpackResponse(_ string) AWResponse {
+	return a
+}
+func (a AWUnknownResponse) packResponse() string {
 	return a.text
 }
 
@@ -99,19 +101,21 @@ type AWUnknownRequest struct {
 	text string
 }
 
-func (a *AWUnknownRequest) Acceptable() bool {
+func (a AWUnknownRequest) Acceptable() bool {
 	return true
 }
-func (a *AWUnknownRequest) Response() AWResponse {
+func (a AWUnknownRequest) Response() AWResponse {
 	// Implementation note: AWUnknownRequest and AWUnknownResponse are separate
 	// struct to avoid applications unknowingly casting them to the other type.
-	return &AWUnknownResponse{}
+	return AWUnknownResponse{}
 }
-func (a *AWUnknownRequest) requestSignature() string {
+func (a AWUnknownRequest) requestSignature() string {
 	return a.text
 }
-func (a *AWUnknownRequest) unpackRequest(_ string) {}
-func (a *AWUnknownRequest) packRequest() string {
+func (a AWUnknownRequest) unpackRequest(_ string) AWRequest {
+	return a
+}
+func (a AWUnknownRequest) packRequest() string {
 	return a.text
 }
 
@@ -161,7 +165,7 @@ func newRequest(cmd string) AWRequest {
 			return req
 		}
 	}
-	return &AWUnknownRequest{
+	return AWUnknownRequest{
 		text: cmd,
 	}
 }
@@ -177,7 +181,7 @@ func newResponse(cmd string) AWResponse {
 			return res
 		}
 	}
-	return &AWUnknownResponse{
+	return AWUnknownResponse{
 		text: cmd,
 	}
 }
