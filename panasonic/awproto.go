@@ -79,15 +79,27 @@ func (c *CameraClient) httpGet(path string, query string, user *url.Userinfo) (*
 	})
 }
 
+func guessQuirks(cmd string) quirkMode {
+	// "guess" the endpoint based on the first character of the command
+	if cmd[0] == '#' {
+		return quirkPtz
+	} else {
+		return quirkCamera
+	}
+}
+
 // strCommand sends a command string to the camera over the http transport
 func (c *CameraClient) strCommand(cmd string) (string, error) {
 	var path string
 
 	// "guess" the endpoint based on the first character of the command
-	if cmd[0] == '#' {
+	switch guessQuirks(cmd) {
+	case quirkPtz:
 		path = "/cgi-bin/aw_ptz"
-	} else {
+	case quirkCamera:
 		path = "/cgi-bin/aw_cam"
+	default:
+		panic("unknown command quirks")
 	}
 
 	// Panasonic panels do NOT urlencode the command even though it contains #
@@ -125,7 +137,7 @@ func (c *CameraClient) AWCommand(req AWRequest) (AWResponse, error) {
 	if sig := res.responseSignature(); match(sig, ret) {
 		res.unpackResponse(ret)
 	} else {
-		res = newResponse(ret)
+		res = newResponse(ret, guessQuirks(cmd))
 	}
 
 	if err, ok := res.(AWError); ok {
@@ -147,7 +159,7 @@ func (c *CameraClient) AWBatch() ([]AWResponse, error) {
 	scan := bufio.NewScanner(data.Body)
 	res := make([]AWResponse, 0)
 	for scan.Scan() {
-		res = append(res, newResponse(scan.Text()))
+		res = append(res, newResponse(scan.Text(), quirkBatch))
 	}
 	if err := scan.Err(); err != nil {
 		return nil, &SystemError{err}

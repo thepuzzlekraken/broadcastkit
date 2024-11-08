@@ -201,7 +201,7 @@ func (l *NotifyListener) Accept() (AWResponse, error) {
 		return nil, &SystemError{err}
 	}
 
-	return newResponse(cmd), nil
+	return newResponse(cmd, quirkNotify), nil
 }
 
 // Close closes the listener.

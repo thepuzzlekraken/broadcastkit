@@ -67,7 +67,8 @@ type awQuirkedPacking interface {
 type quirkMode int
 
 const (
-	quirkBatch  quirkMode = iota // set when in a batch reply
+	quirkNone   quirkMode = iota // set when usage pattern is unknown
+	quirkBatch                   // set when in a batch reply
 	quirkNotify                  // set when in a notification
 	quirkCamera                  // set when in an aw_cam endpoint
 	quirkPtz                     // set when in an aw_ptz endpoint
@@ -171,12 +172,18 @@ func newRequest(cmd string) AWRequest {
 }
 
 // newResponse creates a new response via the factory
-func newResponse(cmd string) AWResponse {
+func newResponse(cmd string, quirks quirkMode) AWResponse {
 	// This function is less critical than newRequest(), because the object
 	// returned by AWRequest.Response() is used in happy-path response creation.
 	for _, e := range awResponseTable {
 		if match(e.sig, cmd) {
 			res := e.new()
+			if qRes, ok := res.(awQuirkedPacking); quirks != quirkNone && ok {
+				res = qRes.packingQuirk(quirks)
+				if !match(res.responseSignature(), cmd) {
+					continue
+				}
+			}
 			res = res.unpackResponse(cmd)
 			return res
 		}

@@ -1178,20 +1178,53 @@ func (p Preset) Acceptable() bool {
 // Most requests affecting presets will return this response instead of
 // themselves.
 type AWPreset struct {
+	quirk  bool
 	Preset Preset
 }
 
 func init() { registerResponse(func() AWResponse { return AWPreset{} }) }
+func init() { registerResponse(func() AWResponse { return AWPreset{quirk: true, Preset: 0} }) }
+func init() { registerResponse(func() AWResponse { return AWPreset{quirk: true, Preset: 99} }) }
 
 func (a AWPreset) responseSignature() string {
+	if a.quirk {
+		if a.Preset < 9 {
+			return "s\x02"
+		}
+		if a.Preset < 99 {
+			return "s\x02\x02"
+		}
+		return "s100"
+	}
 	return "s\x02\x02"
 }
 func (a AWPreset) unpackResponse(cmd string) AWResponse {
+	if a.quirk {
+		a.Preset = Preset(dec2int(cmd[1:])) - 1
+		return a
+	}
 	a.Preset = toPreset(cmd[1:3])
 	return a
 }
 func (a AWPreset) packResponse() string {
+	if a.quirk {
+		n := max(min(int(a.Preset), 99), -1) + 1
+		return "s" + strconv.Itoa(n)
+	}
 	return "s" + a.Preset.toWire()
+}
+func (a AWPreset) packingQuirk(mode quirkMode) AWResponse {
+	a.quirk = mode == quirkBatch
+	if (!a.quirk) && (a.Preset == -1) {
+		// Preset -1 means "no preset". This is only representable in quirkBatch
+		// interpretation, we have to fail to an error otherwise.
+		return AWError{
+			cap:  false,
+			No:   2,
+			Flag: "S",
+		}
+	}
+	return a
 }
 
 // AWPresetRegister saves the current camera position as a preset.

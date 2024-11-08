@@ -85,7 +85,7 @@ func Test_ResponseConflicts(t *testing.T) {
 				t.Errorf("%v.responseSignature() = %v, want %v", cmd1, cmd1.responseSignature(), tt.sig)
 			}
 			str := generateMatch(tt.sig, seed)
-			cmd2 := newResponse(str)
+			cmd2 := newResponse(str, quirkNone) // no way to guess quirks, use the notify channel representation for testing
 			ref2 := reflect.TypeOf(cmd2)
 			sig2 := cmd2.responseSignature()
 			if sig2 != tt.sig {
@@ -294,7 +294,7 @@ func TestAWResponse(t *testing.T) {
 			if !match(sig, tt.resStr) {
 				t.Errorf("match(%v,%v) = false, want true", sig, tt.resStr)
 			}
-			new := newResponse(tt.resStr)
+			new := newResponse(tt.resStr, quirkNotify)
 			if !ExportedEqual(new, tt.response) {
 				t.Errorf("newResponse(%v) -> %v, want %v", tt.resStr, new, tt.response)
 			}
