@@ -1,167 +1,117 @@
 package panasonic
 
-import (
-	"reflect"
-	"testing"
-)
+import "testing"
 
-func TestAWPresetEntriesUnpackResponse(t *testing.T) {
+func TestAWPresetEntries(t *testing.T) {
 	tests := []struct {
-		name     string
-		cmd      string
-		expected AWPresetEntries
+		name   string
+		input  Bits128
+		want00 AWPresetEntries00
+		want01 AWPresetEntries01
+		want02 AWPresetEntries02
 	}{
 		{
-			name: "Offset 0",
-			cmd:  "pE008000000001",
-			expected: AWPresetEntries{
-				Offset: 0,
-				Bits:   Bits64(0).Set(0).Set(39),
-			},
+			name:   "zero bits",
+			input:  Bits128{},
+			want00: AWPresetEntries00{Bits: 0},
+			want01: AWPresetEntries01{Bits: 0},
+			want02: AWPresetEntries02{Bits: 0},
 		},
 		{
-			name: "Offset 1",
-			cmd:  "pE018000000010",
-			expected: AWPresetEntries{
-				Offset: 1,
-				Bits:   Bits64(0).Set(4).Set(39),
-			},
+			name:   "all bits set",
+			input:  Bits128{Hi: 0x00FFFFFFFFFFFFFF, Lo: 0xFFFFFFFFFFFFFFFF},
+			want00: AWPresetEntries00{Bits: 0xFFFFFFFFFF},
+			want01: AWPresetEntries01{Bits: 0xFFFFFFFFFF},
+			want02: AWPresetEntries02{Bits: 0xFFFFFFFFFF},
 		},
 		{
-			name: "Offset 2",
-			cmd:  "pE020000080100",
-			expected: AWPresetEntries{
-				Offset: 2,
-				Bits:   Bits64(0).Set(8).Set(19),
-			},
+			name:   "sequential bits",
+			input:  Bits128{Hi: 0x003456789ABCDEF0, Lo: 0xFEDCBA9876543210},
+			want00: AWPresetEntries00{Bits: 0x9876543210},
+			want01: AWPresetEntries01{Bits: 0xDEF0FEDCBA},
+			want02: AWPresetEntries02{Bits: 0x3456789ABC},
 		},
 		{
-			name: "All Ones",
-			cmd:  "pE00FFFFFFFFFF",
-			expected: AWPresetEntries{
-				Offset: 0,
-				Bits:   Bits64(0xFFFFFFFFFF),
-			},
+			name:   "single bit set",
+			input:  Bits128{Hi: 0x0000000000000001, Lo: 0x0000000000000000},
+			want00: AWPresetEntries00{Bits: 0x0000000000},
+			want01: AWPresetEntries01{Bits: 0x0001000000},
+			want02: AWPresetEntries02{Bits: 0x0000000000},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a := AWPresetEntries{}.unpackResponse(tt.cmd)
-			if !reflect.DeepEqual(a, tt.expected) {
-				t.Errorf("unpackResponse() = %v, want %v", a, tt.expected)
+			got00, got01, got02 := AWPresetEntries(tt.input)
+			if got00 != tt.want00 {
+				t.Errorf("AWPresetEntries() got00 = %v, want %v", got00, tt.want00)
+			}
+			if got01 != tt.want01 {
+				t.Errorf("AWPresetEntries() got01 = %v, want %v", got01, tt.want01)
+			}
+			if got02 != tt.want02 {
+				t.Errorf("AWPresetEntries() got02 = %v, want %v", got02, tt.want02)
 			}
 		})
 	}
 }
-func TestAWPresetEntriesPackResponse(t *testing.T) {
+
+func TestAWPresetEntriesMask(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    AWPresetEntries
-		expected string
+		name string
+		cmd  interface{ Mask() Bits128 }
+		want Bits128
 	}{
 		{
-			name: "Offset 0 with some entries",
-			input: AWPresetEntries{
-				Offset: 0,
-				Bits:   Bits64(0).Set(0).Set(5).Set(10),
-			},
-			expected: "pE000000000421",
+			name: "AWPresetEntries00",
+			cmd:  AWPresetEntries00{Bits: 0xFFFFFFFFFF},
+			want: Bits128{0xFFFFFFFFFF, 0x0},
 		},
 		{
-			name: "Offset 1 with some entries",
-			input: AWPresetEntries{
-				Offset: 1,
-				Bits:   Bits64(0).Set(0).Set(5).Set(10).Set(39),
-			},
-			expected: "pE018000000421",
+			name: "AWPresetEntries01",
+			cmd:  AWPresetEntries01{Bits: 0xFFFFFFFFFF},
+			want: Bits128{0xFFFFFF0000000000, 0xFFFF},
 		},
 		{
-			name: "Offset 2 with some entries",
-			input: AWPresetEntries{
-				Offset: 2,
-				Bits:   Bits64(0).Set(0).Set(5).Set(10),
-			},
-			expected: "pE020000000421",
-		},
-		{
-			name: "Invalid negative offset",
-			input: AWPresetEntries{
-				Offset: -1,
-				Bits:   Bits64(0),
-			},
-			expected: "pEFF0000000000",
-		},
-		{
-			name: "Empty entries",
-			input: AWPresetEntries{
-				Offset: 0,
-				Bits:   Bits64(0),
-			},
-			expected: "pE000000000000",
-		},
-		{
-			name: "All entries set",
-			input: AWPresetEntries{
-				Offset: 0,
-				Bits:   Bits64(0xFFFFFFFFFF),
-			},
-			expected: "pE00FFFFFFFFFF",
+			name: "AWPresetEntries02",
+			cmd:  AWPresetEntries02{Bits: 0xFFFFFFFFFF},
+			want: Bits128{0x0, 0xFFFFFFFFFF0000},
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.input.packResponse()
-			if result != tt.expected {
-				t.Errorf("packResponse() = %v, want %v", result, tt.expected)
+			if got := tt.cmd.Mask(); got != tt.want {
+				t.Errorf("Mask() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
-func TestFuseOffset_Mask(t *testing.T) {
+func TestAWPresetEntriesPresetBits(t *testing.T) {
 	tests := []struct {
-		name     string
-		offset   Offset
-		expected Bits128
+		name string
+		cmd  interface{ PresetBits() Bits128 }
+		want Bits128
 	}{
 		{
-			name:     "Offset 0",
-			offset:   0,
-			expected: Bits128{0xFFFFFFFFFF, 0x0},
+			name: "AWPresetEntries00",
+			cmd:  AWPresetEntries00{Bits: 0x3214567890},
+			want: Bits128{0x3214567890, 0x0},
 		},
 		{
-			name:     "Offset 1",
-			offset:   1,
-			expected: Bits128{0xFFFFFF0000000000, 0xFFFF},
+			name: "AWPresetEntries01",
+			cmd:  AWPresetEntries01{Bits: 0xDEADBEEF99},
+			want: Bits128{0xBEEF990000000000, 0xDEAD},
 		},
 		{
-			name:     "Offset 2",
-			offset:   2,
-			expected: Bits128{0x0, 0xFFFFFFFFFF0000},
-		},
-		{
-			name:     "Offset 3",
-			offset:   3,
-			expected: Bits128{0x0, 0xFF00000000000000},
-		},
-		{
-			name:     "Negative Offset",
-			offset:   -1,
-			expected: Bits128{0x0, 0x0},
-		},
-		{
-			name:     "Large Offset",
-			offset:   10,
-			expected: Bits128{0x0, 0x0},
+			name: "AWPresetEntries02",
+			cmd:  AWPresetEntries02{Bits: 0xB000B},
+			want: Bits128{0x0, 0xB000B0000},
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.offset.Mask()
-			if !reflect.DeepEqual(result, tt.expected) {
-				t.Errorf("Offset(%d).Mask() = %x, want %x", tt.offset, result, tt.expected)
+			if got := tt.cmd.PresetBits(); got != tt.want {
+				t.Errorf("PresetBits() = %v, want %v", got, tt.want)
 			}
 		})
 	}

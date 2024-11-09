@@ -47,6 +47,10 @@ func (b Bits64) ShiftRight(n uint8) Bits64 {
 	return b
 }
 
+func (b Bits64) Zero() bool {
+	return b == 0
+}
+
 // Bits128 is effectively a uint128 for binary masks
 type Bits128 struct {
 	Lo uint64
@@ -107,6 +111,9 @@ func (b Bits128) ShiftRight(n uint8) Bits128 {
 	b.Lo |= (b.Hi << (64 - n))
 	b.Hi >>= n
 	return b
+}
+func (b Bits128) Zero() bool {
+	return (b.Lo | b.Hi) == 0
 }
 
 // charSet is a clever bitmask to check for ASCII char existence in a set.

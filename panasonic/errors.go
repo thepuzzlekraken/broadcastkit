@@ -59,9 +59,9 @@ func init() {
 
 // NewAWError creates an AWError as a Panasonic device would.
 // This is intended for simulating errors as a proxy or virtual device.
-func NewAWError(n AWErrNo, c AWRequest) *AWError {
+func NewAWError(n AWErrNo, c AWRequest) AWError {
 	t := c.packRequest()
-	return &AWError{
+	return AWError{
 		cap:  len(t) > 0 && t[0] != '#',
 		No:   n,
 		Flag: t[:min(len(t), 3)],

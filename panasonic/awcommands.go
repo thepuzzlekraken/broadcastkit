@@ -1509,130 +1509,170 @@ func (a AWPresetSpeedTable) packResponse() string {
 	return "pST" + a.Table.toWire()
 }
 
-type Offset int
-
-func (f Offset) Acceptable() bool {
-	return f >= 0 && f <= 2
-}
-func (f Offset) toWire() string {
-	return int2hex(int(f), 2)
-}
-func toOffset(data string) Offset {
-	return Offset(hex2int(data[0:2]))
-}
-
-// AWPresetEntries returns a bitmask of the stored presets.
-//
-// Due the the on-wire representation, a single command can not represent all
-// 100 presets available. Presets are returned in groups of 40, defined by
-// the offset parameter:
-// offset(0) -> preset 0-39
-// offset(1) -> preset 40-79
-// offset(2) -> preset 80-119 (unused above 99)
-// You can use the Apply and Mask helper functions on Offset to process the Bits
-type AWPresetEntries struct {
-	Bits   Bits64
-	Offset Offset
-}
-
-func init() { registerResponse(func() AWResponse { return AWPresetEntries{} }) }
-
-func (a AWPresetEntries) responseSignature() string {
-	return "pE\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01"
-}
-func (a AWPresetEntries) unpackResponse(cmd string) AWResponse {
-	_ = cmd[13]
-	a.Offset = toOffset(cmd[2:4])
+func unpack40Bits(hex string) Bits64 {
 	var b Bits64
-	b |= Bits64(strings.IndexByte(hexAlphabet, cmd[4]) & 0xF).ShiftLeft(36)
-	b |= Bits64(strings.IndexByte(hexAlphabet, cmd[5]) & 0xF).ShiftLeft(32)
-	b |= Bits64(strings.IndexByte(hexAlphabet, cmd[6]) & 0xF).ShiftLeft(28)
-	b |= Bits64(strings.IndexByte(hexAlphabet, cmd[7]) & 0xF).ShiftLeft(24)
-	b |= Bits64(strings.IndexByte(hexAlphabet, cmd[8]) & 0xF).ShiftLeft(20)
-	b |= Bits64(strings.IndexByte(hexAlphabet, cmd[9]) & 0xF).ShiftLeft(16)
-	b |= Bits64(strings.IndexByte(hexAlphabet, cmd[10]) & 0xF).ShiftLeft(12)
-	b |= Bits64(strings.IndexByte(hexAlphabet, cmd[11]) & 0xF).ShiftLeft(8)
-	b |= Bits64(strings.IndexByte(hexAlphabet, cmd[12]) & 0xF).ShiftLeft(4)
-	b |= Bits64(strings.IndexByte(hexAlphabet, cmd[13]) & 0xF).ShiftLeft(0)
-	a.Bits = b
-	return a
+	_ = hex[9]
+	b |= Bits64(strings.IndexByte(hexAlphabet, hex[0]) & 0xF).ShiftLeft(36)
+	b |= Bits64(strings.IndexByte(hexAlphabet, hex[1]) & 0xF).ShiftLeft(32)
+	b |= Bits64(strings.IndexByte(hexAlphabet, hex[2]) & 0xF).ShiftLeft(28)
+	b |= Bits64(strings.IndexByte(hexAlphabet, hex[3]) & 0xF).ShiftLeft(24)
+	b |= Bits64(strings.IndexByte(hexAlphabet, hex[4]) & 0xF).ShiftLeft(20)
+	b |= Bits64(strings.IndexByte(hexAlphabet, hex[5]) & 0xF).ShiftLeft(16)
+	b |= Bits64(strings.IndexByte(hexAlphabet, hex[6]) & 0xF).ShiftLeft(12)
+	b |= Bits64(strings.IndexByte(hexAlphabet, hex[7]) & 0xF).ShiftLeft(8)
+	b |= Bits64(strings.IndexByte(hexAlphabet, hex[8]) & 0xF).ShiftLeft(4)
+	b |= Bits64(strings.IndexByte(hexAlphabet, hex[9]) & 0xF).ShiftLeft(0)
+	return b
 }
-func (a AWPresetEntries) packResponse() string {
-	o := a.Offset
-	if o < 0 {
-		// represent invalid offsets as invalid
-		return "pEFF0000000000"
-	}
-	s := make([]byte, 14)
-	copy(s, "pE")
-	copy(s[2:], o.toWire())
-	b := a.Bits
-	s[4] = hexAlphabet[(b>>36)&0xF]
-	s[5] = hexAlphabet[(b>>32)&0xF]
-	s[6] = hexAlphabet[(b>>28)&0xF]
-	s[7] = hexAlphabet[(b>>24)&0xF]
-	s[8] = hexAlphabet[(b>>20)&0xF]
-	s[9] = hexAlphabet[(b>>16)&0xF]
-	s[10] = hexAlphabet[(b>>12)&0xF]
-	s[11] = hexAlphabet[(b>>8)&0xF]
-	s[12] = hexAlphabet[(b>>4)&0xF]
-	s[13] = hexAlphabet[(b>>0)&0xF]
+
+func pack40Bits(b Bits64) string {
+	s := make([]byte, 10)
+	s[0] = hexAlphabet[(b>>36)&0xF]
+	s[1] = hexAlphabet[(b>>32)&0xF]
+	s[2] = hexAlphabet[(b>>28)&0xF]
+	s[3] = hexAlphabet[(b>>24)&0xF]
+	s[4] = hexAlphabet[(b>>20)&0xF]
+	s[5] = hexAlphabet[(b>>16)&0xF]
+	s[6] = hexAlphabet[(b>>12)&0xF]
+	s[7] = hexAlphabet[(b>>8)&0xF]
+	s[8] = hexAlphabet[(b>>4)&0xF]
+	s[9] = hexAlphabet[(b>>0)&0xF]
 	return string(s)
 }
 
-// Mask returns a bitmask of the bits represented on the given preset offset.
+// AWPresetEntries00 is the first 40 bits of the stored presets bitmask
 //
-// This function helps to determine the bits valid inside an AWPresetEntries
-func (o Offset) Mask() Bits128 {
-	if o < 0 || o > 3 {
-		return Bits128{0x0, 0x0}
-	}
-	return Bits128{0xFFFFFFFFFF, 0x0}.ShiftLeft(uint8(o * 40))
+// Due the the on-wire representation, a single response can not represent all
+// 100 presets available. Presets are returned in groups of 40 as represented by
+// AWPresetEntries00 -> preset 0-39
+// AWPresetEntries01 -> preset 40-79
+// AWPresetEntries02 -> preset 80-119 (bits unused above 99)
+type AWPresetEntries00 struct {
+	Bits Bits64
 }
 
-// Expand converts a partial ofsetted bitmask into a full-sized mask.
-//
-// All bits non-representable on the offset will be zero.
-func (o Offset) Expand(b Bits64) Bits128 {
-	if o < 0 || o > 3 {
-		return Bits128{0x0, 0x0}
-	}
-	return Bits128{uint64(b), 0x0}.ShiftLeft(uint8(o * 40))
+func init() { registerResponse(func() AWResponse { return AWPresetEntries00{} }) }
+
+func (a AWPresetEntries00) responseSignature() string {
+	return "pE00\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01"
+}
+func (a AWPresetEntries00) unpackResponse(cmd string) AWResponse {
+	a.Bits = unpack40Bits(cmd[4:14])
+	return a
+}
+func (a AWPresetEntries00) packResponse() string {
+	return "pE00" + pack40Bits(a.Bits)
 }
 
-// Cut returns the part of the full bitmask representable on this offset.
-func (o Offset) Cut(b Bits128) Bits64 {
-	b = b.ShiftRight(uint8(o * 40))
-	return Bits64(b.Lo)
+// Mask returns a bitmask of the bits represented by this command.
+// This function helps to determine the bits valid inside an AWPresetXX
+func (a AWPresetEntries00) Mask() Bits128 {
+	return Bits128{0xFFFFFFFFFF, 0x0}.ShiftLeft(uint8(0 * 40))
 }
 
-// Offset returns the Offset capable of representing this Preset.
-//
-// This function helps to determine the offset to use in AWPresetEntries
-func (p Preset) Offset() Offset {
-	return Offset(int(p) / 10)
+// Preset bits returns a full-sized 128 bit representation of Bits which are
+// valid for the Mask of this command.
+func (a AWPresetEntries00) PresetBits() Bits128 {
+	return Bits128{uint64(a.Bits), 0x0}.ShiftLeft(uint8(0 * 40))
 }
 
+// AWPresetEntries01 is the second 40 bits of the stored presets bitmask
+type AWPresetEntries01 struct {
+	Bits Bits64
+}
+
+func init() { registerResponse(func() AWResponse { return AWPresetEntries01{} }) }
+func (a AWPresetEntries01) responseSignature() string {
+	return "pE01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01"
+}
+func (a AWPresetEntries01) unpackResponse(cmd string) AWResponse {
+	a.Bits = unpack40Bits(cmd[4:14])
+	return a
+}
+func (a AWPresetEntries01) packResponse() string {
+	return "pE01" + pack40Bits(a.Bits)
+}
+
+// Mask returns a bitmask of the bits represented by this command.
+func (a AWPresetEntries01) Mask() Bits128 {
+	return Bits128{0xFFFFFFFFFF, 0x0}.ShiftLeft(uint8(1 * 40))
+}
+
+// PresetBits returns a full-sized 128 bit representation of Bits which are
+// valid for the Mask of this command.
+func (a AWPresetEntries01) PresetBits() Bits128 {
+	return Bits128{uint64(a.Bits), 0x0}.ShiftLeft(uint8(1 * 40))
+}
+
+// AWPresetEntries02 is the third 40 bits of the stored presets bitmask
+type AWPresetEntries02 struct {
+	Bits Bits64
+}
+
+func init() { registerResponse(func() AWResponse { return AWPresetEntries02{} }) }
+func (a AWPresetEntries02) responseSignature() string {
+	return "pE02\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01"
+}
+func (a AWPresetEntries02) unpackResponse(cmd string) AWResponse {
+	a.Bits = unpack40Bits(cmd[4:14])
+	return a
+}
+func (a AWPresetEntries02) packResponse() string {
+	return "pE02" + pack40Bits(a.Bits)
+}
+
+// Mask returns a bitmask of the bits represented by this command.
+func (a AWPresetEntries02) Mask() Bits128 {
+	return Bits128{0xFFFFFFFFFF, 0x0}.ShiftLeft(uint8(2 * 40))
+}
+
+// PresetBits returns a full-sized 128 bit representation of Bits which are
+// valid for the Mask of this command.
+func (a AWPresetEntries02) PresetBits() Bits128 {
+	return Bits128{uint64(a.Bits), 0x0}.ShiftLeft(uint8(2 * 40))
+}
+
+// AWPresetEntries returns the 3 AWCommands that together represent the 100
+// bits of possible presets.
+func AWPresetEntries(b Bits128) (AWPresetEntries00, AWPresetEntries01, AWPresetEntries02) {
+	b0 := b.ShiftRight(uint8(0*40)).Lo & 0xFFFFFFFFFF
+	b1 := b.ShiftRight(uint8(1*40)).Lo & 0xFFFFFFFFFF
+	b2 := b.ShiftRight(uint8(2*40)).Lo & 0xFFFFFFFFFF
+	return AWPresetEntries00{Bits: Bits64(b0)},
+		AWPresetEntries01{Bits: Bits64(b1)},
+		AWPresetEntries02{Bits: Bits64(b2)}
+}
+
+// AWPresetEntriesQuery is a query for the bits indicating stored presets.
 type AWPresetEntriesQuery struct {
-	Offset Offset
+	Offset int
 }
 
 func init() { registerRequest(func() AWRequest { return AWPresetEntriesQuery{} }) }
 func (a AWPresetEntriesQuery) Acceptable() bool {
-	return a.Offset.Acceptable()
+	return a.Offset >= 0 && a.Offset <= 2
 }
 func (a AWPresetEntriesQuery) Response() AWResponse {
-	return AWPresetEntries{Offset: a.Offset}
+	switch a.Offset {
+	case 0:
+		return AWPresetEntries00{}
+	case 1:
+		return AWPresetEntries01{}
+	case 2:
+		return AWPresetEntries02{}
+	default:
+		return NewAWError(AWErrUnsupported, a)
+	}
 }
 func (a AWPresetEntriesQuery) requestSignature() string {
 	return "#PE\x01\x01"
 }
 func (a AWPresetEntriesQuery) unpackRequest(cmd string) AWRequest {
-	a.Offset = toOffset(cmd[3:5])
+	a.Offset = hex2int(cmd[3:5])
 	return a
 }
 func (a AWPresetEntriesQuery) packRequest() string {
-	return "#PE" + a.Offset.toWire()
+	return "#PE" + int2hex(a.Offset, 2)
 }
 
 // AWPresetPlayback is a response indicating a preset position has just been
