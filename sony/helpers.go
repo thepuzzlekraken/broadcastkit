@@ -32,15 +32,17 @@ func atoi(s string) (int, error) {
 func castGeneric[T Parameter](ss []T) []Parameter {
 	gs := make([]Parameter, len(ss))
 	for i, p := range ss {
-		gs[i] = p
+		gs[i] = Parameter(p)
 	}
 	return gs
 }
 
 func castSpecific[T Parameter](gs []Parameter) []T {
-	ss := make([]T, len(gs))
-	for i, p := range ss {
-		ss[i] = p
+	ss := make([]T, 0, len(gs))
+	for _, p := range gs {
+		if s, ok := p.(T); ok {
+			ss = append(ss, s)
+		}
 	}
 	return ss
 }

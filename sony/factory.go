@@ -1,26 +1,23 @@
 package sony
 
-import "fmt"
-
-type endpoint string
-
-const inquiryEndpoint endpoint = "inquiry"
-
-// inquiryParameter is the parameter passed to the special inquery endpoint
-// to download all parameters of a different endpoint. It is intentionally not
-// registered as it should never be returned from the camera.
-type inquiryParameter endpoint
-
-func (_ inquiryParameter) parameterKey() string {
-	return "inq"
+type UnknownParameter struct {
+	key   string
+	value string
 }
-func (ep inquiryParameter) parameterValue() string {
-	return string(ep) // cut leading slash and trailing .cgi
+
+func (p UnknownParameter) parameterKey() string {
+	return p.key
 }
-func (_ inquiryParameter) parameterParse(s string) (Parameter, error) {
-	return inquiryParameter(s), nil
+func (p UnknownParameter) parameterValue() string {
+	return p.value
 }
-func (_ inquiryParameter) Valid() bool {
+func (p UnknownParameter) parameterParse(val string) (Parameter, error) {
+	return UnknownParameter{
+		key:   p.key,
+		value: val,
+	}, nil
+}
+func (p UnknownParameter) Valid() bool {
 	return true
 }
 
@@ -31,26 +28,20 @@ type Parameter interface {
 	parameterParse(string) (Parameter, error)
 }
 
-var parameterTable = make(map[endpoint]map[string]func() Parameter)
+var parameterTable = make(map[string]func() Parameter)
 
-func registerParameter(ep endpoint, new func() Parameter) {
+func registerParameter(new func() Parameter) {
 	key := new().parameterKey()
-	_, ok := parameterTable[ep]
-	if !ok {
-		parameterTable[ep] = make(map[string]func() Parameter)
-	}
-	parameterTable[ep][key] = new
+	parameterTable[key] = new
 }
 
-func createParameter(ep endpoint, key string, val string) (Parameter, error) {
-	_, ok := parameterTable[ep]
+func createParameter(key string, val string) (Parameter, error) {
+	new, ok := parameterTable[key]
 	if !ok {
-		// This should never happen, aid debugging
-		panic("lookup of non-existent sony parameter table")
-	}
-	new, ok := parameterTable[ep][key]
-	if !ok {
-		return nil, fmt.Errorf("unknown parameter: %s.cgi?%s=...", ep, key)
+		return UnknownParameter{
+			key:   key,
+			value: val,
+		}, nil
 	}
 	p, err := new().parameterParse(val)
 	if err != nil {
