@@ -51,6 +51,16 @@ func (c *CameraClient) httpInit() {
 	}
 }
 
+func pathOf(ep Endpoint) string {
+	if ep == "" {
+		return "/"
+	}
+	if ep[0] != '/' {
+		return "/command/" + string(ep) + ".cgi"
+	}
+	return string(ep)
+}
+
 func (c *CameraClient) httpReq(ctx context.Context, ep Endpoint, ps ...Parameter) *http.Request {
 	var u url.URL
 
@@ -65,9 +75,7 @@ func (c *CameraClient) httpReq(ctx context.Context, ep Endpoint, ps ...Parameter
 
 	u.Path = "/" // Terminating slash is required for the Referer header
 	referer := u.String()
-	if ep != "" {
-		u.Path = "/command/" + string(ep) + ".cgi"
-	}
+	u.Path = pathOf(ep)
 
 	v := make(url.Values, len(ps))
 	for _, p := range ps {
@@ -100,9 +108,13 @@ func (c *CameraClient) Set(ep Endpoint, ps []Parameter) error {
 	return nil
 }
 
-func (c *CameraClient) Inq(ep Endpoint) ([]Parameter, error) {
+func (c *CameraClient) Inq(ep ...Endpoint) ([]Parameter, error) {
 	c.httpOnce.Do(c.httpInit)
-	res, err := c.Http.Do(c.httpReq(context.Background(), inquiryEndpoint, inqParam(ep)))
+	params := make([]Parameter, len(ep))
+	for i, ep := range ep {
+		params[i] = inqParam(ep)
+	}
+	res, err := c.Http.Do(c.httpReq(context.Background(), inquiryEndpoint, params...))
 
 	if err != nil {
 		return nil, fmt.Errorf("parameter inquery error: %w", err)
@@ -293,4 +305,35 @@ func (c *CameraClient) SetPresetposition(p ...PresetpositionParameter) error {
 func (c *CameraClient) InqPresetposition() ([]PresetpositionParameter, error) {
 	gs, err := c.Inq(PresetpositionEndpoint)
 	return castSpecific[PresetpositionParameter](gs), err
+}
+
+const NetworkEndpoint = "network"
+
+type NetworkParameter interface {
+	Parameter
+	_networkParameter()
+}
+
+func (c *CameraClient) SetNetwork(p ...NetworkParameter) error {
+	return c.Set(NetworkEndpoint, castGeneric(p))
+}
+func (c *CameraClient) InqNetwork() ([]NetworkParameter, error) {
+	gs, err := c.Inq(NetworkEndpoint)
+	return castSpecific[NetworkParameter](gs), err
+}
+
+func (c *CameraClient) ScreenshotOfPreset(p Preset) ([]byte, error) {
+	c.httpOnce.Do(c.httpInit)
+
+	ep := Endpoint(fmt.Sprintf("/preset/presetimg%d.jpg", p))
+	res, err := c.Http.Do(c.httpReq(context.Background(), ep))
+	if err != nil {
+		return nil, fmt.Errorf("screenshot download error: %w", err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status: %s", res.Status)
+	}
+
+	return io.ReadAll(res.Body)
 }

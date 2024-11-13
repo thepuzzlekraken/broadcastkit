@@ -92,13 +92,13 @@ func (p PresetName) Valid() bool {
 type Switch string
 
 const (
-	BoolOn  Switch = "on"
-	BoolOff Switch = "off"
+	SwitchOn  Switch = "on"
+	SwitchOff Switch = "off"
 )
 
 func (s Switch) Valid() bool {
 	switch s {
-	case BoolOn, BoolOff:
+	case SwitchOn, SwitchOff:
 		return true
 	default:
 		return false
@@ -718,4 +718,31 @@ func (p SpeedSelectParam) Valid() bool {
 func (SpeedSelectParam) _presetpositionParameter() {}
 func init() {
 	registerParameter(func() Parameter { return SpeedSelectParam{} })
+}
+
+//
+// Parameters for NetworkEndpoint
+//
+
+type CameraNameParam struct {
+	Name string
+}
+
+func (CameraNameParam) parameterKey() string {
+	return "CameraName"
+}
+func (p CameraNameParam) parameterValue() string {
+	return p.Name
+}
+func (CameraNameParam) parameterParse(s string) (Parameter, error) {
+	return CameraNameParam{
+		Name: s,
+	}, nil
+}
+func (p CameraNameParam) Valid() bool {
+	return len(p.Name) <= 8
+}
+func (CameraNameParam) _networkParameter() {}
+func init() {
+	registerParameter(func() Parameter { return CameraNameParam{} })
 }
