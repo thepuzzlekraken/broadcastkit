@@ -2,6 +2,8 @@ package sony
 
 import (
 	"fmt"
+	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -45,4 +47,35 @@ func castSpecific[T Parameter](gs []Parameter) []T {
 		}
 	}
 	return ss
+}
+
+func urlEncode(v url.Values) string {
+	// This function is copied from the standard library.
+	// The Sony FR-7 cameras do NOT accept space as "+" in the query strings.
+	// This function has a workaround to standard-breakingly leave spaces alone.
+	if len(v) == 0 {
+		return ""
+	}
+	var buf strings.Builder
+	keys := make([]string, 0, len(v))
+	for k := range v {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	for _, k := range keys {
+		vs := v[k]
+		keyEscaped := url.QueryEscape(k)
+		keyEscaped = strings.ReplaceAll(keyEscaped, "+", " ")
+		for _, v := range vs {
+			if buf.Len() > 0 {
+				buf.WriteByte('&')
+			}
+			buf.WriteString(keyEscaped)
+			buf.WriteByte('=')
+			val := url.QueryEscape(v)
+			val = strings.ReplaceAll(val, "+", " ")
+			buf.WriteString(val)
+		}
+	}
+	return buf.String()
 }

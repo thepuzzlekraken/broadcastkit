@@ -491,7 +491,8 @@ func (p PresetNameParam) parameterValue() string {
 	parts := make([]string, len(keys)*2)
 	for i, k := range keys {
 		parts[i*2] = itoa(int(k))
-		parts[i*2+1] = string(p.Names[k])
+		name := strings.ReplaceAll(string(p.Names[k]), ",", "")
+		parts[i*2+1] = name
 	}
 	return commaJoin(parts...)
 }

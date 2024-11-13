@@ -81,7 +81,7 @@ func (c *CameraClient) httpReq(ctx context.Context, ep Endpoint, ps ...Parameter
 	for _, p := range ps {
 		v.Add(p.parameterKey(), p.parameterValue())
 	}
-	u.RawQuery = v.Encode()
+	u.RawQuery = urlEncode(v)
 
 	r, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
 	if err != nil {
