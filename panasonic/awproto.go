@@ -56,7 +56,7 @@ func (c *CameraClient) httpGet(path string, query string, user *url.Userinfo) (*
 	//   Host:198.051.100.008
 	// We use a proper HTTP client instead.
 	var host string
-	if c.Remote.Port() == 0 {
+	if port := c.Remote.Port(); port == 0 || port == 80 {
 		host = c.Remote.Addr().String()
 	} else {
 		host = c.Remote.String()
