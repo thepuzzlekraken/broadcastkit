@@ -3,6 +3,7 @@ package panasonic
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"math/rand/v2"
@@ -263,6 +264,10 @@ type AWHandler interface {
 	AWCommand(AWRequest) (AWResponse, error)
 	AWBatch() ([]AWResponse, error)
 }
+type AWHandlerCtx interface {
+	AWCommandCtx(context.Context, AWRequest) (AWResponse, error)
+	AWBatchCtx(context.Context) ([]AWResponse, error)
+}
 
 // CameraServer is an http.Handler that implements an endpoint for AW protocol.
 //
@@ -351,7 +356,13 @@ func (c *CameraServer) wrapAW(mode quirkMode, w http.ResponseWriter, r *http.Req
 		return
 	}
 	awcmd := newRequest(strcmd)
-	awres, err := c.AWHandler.AWCommand(awcmd)
+	var awres AWResponse
+	var err error
+	if ctxhandler, ok := c.AWHandler.(AWHandlerCtx); ok {
+		awres, err = ctxhandler.AWCommandCtx(r.Context(), awcmd)
+	} else {
+		awres, err = c.AWHandler.AWCommand(awcmd)
+	}
 	if errres, ok := err.(AWError); ok {
 		awres = errres
 		err = nil
@@ -419,7 +430,13 @@ func (c *CameraServer) serveManSession(w http.ResponseWriter, r *http.Request) {
 
 // serveCamData is the /live/camdata.html endpoint handler
 func (c *CameraServer) serveCamData(w http.ResponseWriter, r *http.Request) {
-	b, err := c.AWHandler.AWBatch()
+	var b []AWResponse
+	var err error
+	if ctxhandler, ok := c.AWHandler.(AWHandlerCtx); ok {
+		b, err = ctxhandler.AWBatchCtx(r.Context())
+	} else {
+		b, err = c.AWHandler.AWBatch()
+	}
 	if err != nil {
 		http.Error(w, "Bad Gateway", http.StatusBadGateway)
 		return
