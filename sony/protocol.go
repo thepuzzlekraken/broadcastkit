@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
@@ -22,33 +23,31 @@ type CameraClient struct {
 	Username string
 	Password string
 
-	Http     http.Client
-	longHttp http.Client
-	referer  string
+	http     http.Client
 	httpOnce sync.Once
 }
 
-const networkTimeout = 5 * time.Second
+const networkTimeout = 3 * time.Second
 const pullPeriod = 60 * time.Second
 
 func (c *CameraClient) httpInit() {
-	c.longHttp = c.Http
 
-	if c.Http.Timeout == 0 {
-		c.Http.Timeout = networkTimeout
+	dialer := net.Dialer{
+		Timeout:   networkTimeout,
+		KeepAlive: 30 * time.Second,
 	}
-	c.longHttp.Timeout = pullPeriod + networkTimeout
+	c.http.Transport = &digest.Transport{
+		Username: c.Username,
+		Password: c.Password,
+		Transport: &http.Transport{
+			Proxy:           http.ProxyFromEnvironment,
+			DialContext:     dialer.DialContext,
+			MaxIdleConns:    10,
+			IdleConnTimeout: pullPeriod,
+		},
+	}
 
-	c.Http.Transport = &digest.Transport{
-		Username:  c.Username,
-		Password:  c.Password,
-		Transport: c.Http.Transport,
-	}
-	c.longHttp.Transport = &digest.Transport{
-		Username:  c.Username,
-		Password:  c.Password,
-		Transport: c.longHttp.Transport,
-	}
+	c.http.Timeout = pullPeriod + networkTimeout
 }
 
 func pathOf(ep Endpoint) string {
@@ -93,8 +92,12 @@ func (c *CameraClient) httpReq(ctx context.Context, ep Endpoint, ps ...Parameter
 }
 
 func (c *CameraClient) Set(ep Endpoint, ps []Parameter) error {
+	return c.SetCtx(context.Background(), ep, ps)
+}
+
+func (c *CameraClient) SetCtx(ctx context.Context, ep Endpoint, ps []Parameter) error {
 	c.httpOnce.Do(c.httpInit)
-	res, err := c.Http.Do(c.httpReq(context.Background(), ep, ps...))
+	res, err := c.http.Do(c.httpReq(ctx, ep, ps...))
 
 	if err != nil {
 		return fmt.Errorf("parameter set error: %w", err)
@@ -109,12 +112,16 @@ func (c *CameraClient) Set(ep Endpoint, ps []Parameter) error {
 }
 
 func (c *CameraClient) Inq(ep ...Endpoint) ([]Parameter, error) {
+	return c.InqCtx(context.Background(), ep...)
+}
+
+func (c *CameraClient) InqCtx(ctx context.Context, ep ...Endpoint) ([]Parameter, error) {
 	c.httpOnce.Do(c.httpInit)
 	params := make([]Parameter, len(ep))
 	for i, ep := range ep {
 		params[i] = inqParam(ep)
 	}
-	res, err := c.Http.Do(c.httpReq(context.Background(), inquiryEndpoint, params...))
+	res, err := c.http.Do(c.httpReq(ctx, inquiryEndpoint, params...))
 
 	if err != nil {
 		return nil, fmt.Errorf("parameter inquery error: %w", err)
@@ -156,7 +163,7 @@ func (c *CameraClient) Subscribe(ep ...Endpoint) (SubscriptionIdParam, error) {
 		params = append(params, inqjsonParam(e))
 	}
 
-	res, err := c.Http.Do(c.httpReq(context.Background(), subscribeEndpoint, params...))
+	res, err := c.http.Do(c.httpReq(context.Background(), subscribeEndpoint, params...))
 	if err != nil {
 		return "", err
 	}
@@ -182,7 +189,7 @@ func (c *CameraClient) Subscribe(ep ...Endpoint) (SubscriptionIdParam, error) {
 }
 
 func (c *CameraClient) doPull(ctx context.Context, id SubscriptionIdParam) ([]byte, error) {
-	res, err := c.longHttp.Do(c.httpReq(ctx, pullinqueryEndpoint, id, cacheKillParam{}))
+	res, err := c.http.Do(c.httpReq(ctx, pullinqueryEndpoint, id, cacheKillParam{}))
 	if err != nil {
 		return nil, fmt.Errorf("pull error: %w", err)
 	}
@@ -235,7 +242,7 @@ func (c *CameraClient) PullInq(ctx context.Context, id SubscriptionIdParam) ([]P
 
 func (c *CameraClient) Unsubscribe(id SubscriptionIdParam) error {
 	c.httpOnce.Do(c.httpInit)
-	res, err := c.Http.Do(c.httpReq(context.Background(), unsubscribeEndpoint, id))
+	res, err := c.http.Do(c.httpReq(context.Background(), unsubscribeEndpoint, id))
 	if err != nil {
 		return fmt.Errorf("unsubscribe error: %w", err)
 	}
@@ -326,7 +333,7 @@ func (c *CameraClient) ScreenshotOfPreset(p Preset) ([]byte, error) {
 	c.httpOnce.Do(c.httpInit)
 
 	ep := Endpoint(fmt.Sprintf("/preset/presetimg%d.jpg", p))
-	res, err := c.Http.Do(c.httpReq(context.Background(), ep))
+	res, err := c.http.Do(c.httpReq(context.Background(), ep))
 	if err != nil {
 		return nil, fmt.Errorf("screenshot download error: %w", err)
 	}
