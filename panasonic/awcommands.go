@@ -177,9 +177,11 @@ func (a AWInstallQuery) packRequest() string {
 // MoveUnit represents the unit of pan or tilt movement for the camera.
 //
 // Following the go convention zero-value is the home. One degree rotation is
-// approx 121.35 units. Sign of displacement follows right-hand convention
+// approx 121.21 units. Sign of displacement follows right-hand convention
 // (right:+ left:-) of the viewer when the camera is in DesktopPosition.
 type MoveUnit int
+
+const MoveUnitByDegree = 121.2121
 
 func (m MoveUnit) toWire() string {
 	// offset and inversion for Panasonic home 0 => 0x8000

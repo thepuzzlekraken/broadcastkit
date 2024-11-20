@@ -79,3 +79,69 @@ func urlEncode(v url.Values) string {
 	}
 	return buf.String()
 }
+
+func hexDecode(s string) (int, error) {
+	i := 0
+	for j := 0; j < len(s); j++ {
+		i <<= 4
+		c := s[j]
+		if c <= '9' && c >= '0' {
+			i |= int(c - '0')
+			continue
+		}
+		if c <= 'f' && c >= 'a' {
+			i |= int(c - 'a' + 10)
+			continue
+		}
+		return 0, fmt.Errorf("invalid ascii char in hex: %x", c)
+	}
+	return i, nil
+}
+
+func hex20Decoder(h string) (int, error) {
+	if len(h) != 5 {
+		return 0, fmt.Errorf("invalid hex20 length: %d", len(h))
+	}
+	i, err := hexDecode(h)
+	// fix signage bit underflow
+	if (i & 0x80000) != 0 {
+		i |= ^int(0x7ffff)
+	}
+	return i, err
+}
+
+func hex16Decoder(h string) (int, error) {
+	if len(h) != 4 {
+		return 0, fmt.Errorf("invalid hex16 length: %d", len(h))
+	}
+	i, err := hexDecode(h)
+	// hex16 is unsigned, leave as-is
+	return i, err
+}
+
+const intSize = 32 << (^uint(0) >> 63) // see stdlib math/const.go
+
+func hexEncoder(i int) string {
+	b := make([]byte, intSize/4)
+	for j := intSize / 4; j > 0; j-- {
+		c := i & 0xf
+		if c <= 9 {
+			c += '0'
+		} else {
+			c += 'a' - 10
+		}
+		b[j-1] = byte(c)
+		i >>= 4
+	}
+	return string(b)
+}
+
+func hex20Encoder(i int) string {
+	e := hexEncoder(i)
+	return e[len(e)-5:]
+}
+
+func hex16Encoder(i int) string {
+	e := hexEncoder(i)
+	return e[len(e)-4:]
+}

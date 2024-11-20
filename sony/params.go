@@ -41,6 +41,30 @@ func (s SpeedStep) Valid() bool {
 	return (s >= 0) && (s <= 50)
 }
 
+// SteppedPosition is an absolute distance measurement with 235.9 steps/degree
+type SteppedPosition int
+
+const SteppedPositionByDegree = 235.9
+
+func (s SteppedPosition) Valid() bool {
+	return (s >= -0x7FFFF) && (s <= 0x7FFFF)
+}
+
+func (s SteppedPosition) String() string {
+	return hex20Encoder(int(s))
+}
+
+// SteppedRange is an absolute range measurement within a scale
+type SteppedRange int
+
+func (s SteppedRange) Valid() bool {
+	return (s >= 0) && (s <= 0xFFFF)
+}
+
+func (s SteppedRange) String() string {
+	return hex16Encoder(int(s))
+}
+
 // Direction represents a phisical direction relative to the current image
 // orientation, in the perspective of the camera operator (remove viewer).
 type Direction string
@@ -68,6 +92,26 @@ func (d Direction) Valid() bool {
 		DownLeftDirection,
 		DownRightDirection,
 		StopDirection:
+		return true
+	default:
+		return false
+	}
+}
+
+// ZoomDirection represents a depth direction within the image
+type ZoomDirection string
+
+const (
+	TeleDirection     ZoomDirection = "tele"
+	WideDirection     ZoomDirection = "wide"
+	StopZoomDirection ZoomDirection = "stop"
+)
+
+func (d ZoomDirection) Valid() bool {
+	switch d {
+	case TeleDirection,
+		WideDirection,
+		StopZoomDirection:
 		return true
 	default:
 		return false
@@ -369,6 +413,181 @@ func (PanTiltMoveParam) _ptzfParameter() {}
 func init() {
 
 	registerParameter(func() Parameter { return PanTiltMoveParam{} })
+}
+
+type AbsolutePanTiltParam struct {
+	Pan   SteppedPosition
+	Tilt  SteppedPosition
+	Speed SpeedStep
+}
+
+func (AbsolutePanTiltParam) parameterKey() string {
+	return "AbsolutePanTilt"
+}
+func (p AbsolutePanTiltParam) parameterValue() string {
+	return commaJoin(hex20Encoder(int(p.Pan)),
+		hex20Encoder(int(p.Tilt)),
+		itoa(int(p.Speed)))
+}
+func (AbsolutePanTiltParam) parameterParse(s string) (Parameter, error) {
+	sp := commaSplit(s)
+	if len(sp) != 3 {
+		return nil, fmt.Errorf("invalid comma-joined-list length: %d, expects 3", len(sp))
+	}
+	pan, err := hex20Decoder(sp[0])
+	if err != nil {
+		return nil, err
+	}
+	tilt, err := hex20Decoder(sp[1])
+	if err != nil {
+		return nil, err
+	}
+	speed, err := atoi(sp[2])
+	if err != nil {
+		return nil, err
+	}
+	return AbsolutePanTiltParam{
+		Pan:   SteppedPosition(pan),
+		Tilt:  SteppedPosition(tilt),
+		Speed: SpeedStep(speed),
+	}, nil
+}
+func (p AbsolutePanTiltParam) Valid() bool {
+	return p.Pan.Valid() && p.Tilt.Valid() && p.Speed.Valid()
+}
+func (AbsolutePanTiltParam) _ptzfParameter() {}
+func init() {
+	registerParameter(func() Parameter { return AbsolutePanTiltParam{} })
+}
+
+type AbsolutePTZFParam struct {
+	Pan   SteppedPosition
+	Tilt  SteppedPosition
+	Zoom  SteppedRange
+	Focus SteppedRange
+}
+
+func (AbsolutePTZFParam) parameterKey() string {
+	return "AbsolutePTZF"
+}
+func (p AbsolutePTZFParam) parameterValue() string {
+	return commaJoin(hex20Encoder(int(p.Pan)),
+		hex20Encoder(int(p.Tilt)),
+		hex16Encoder(int(p.Zoom)),
+		hex16Encoder(int(p.Focus)))
+}
+func (AbsolutePTZFParam) parameterParse(s string) (Parameter, error) {
+	sp := commaSplit(s)
+	if len(sp) != 4 {
+		return nil, fmt.Errorf("invalid comma-joined-list length: %d, expects 4", len(sp))
+	}
+	pan, err := hex20Decoder(sp[0])
+	if err != nil {
+		return nil, err
+	}
+	tilt, err := hex20Decoder(sp[1])
+	if err != nil {
+		return nil, err
+	}
+	zoom, err := hex16Decoder(sp[2])
+	if err != nil {
+		return nil, err
+	}
+	focus, err := hex16Decoder(sp[3])
+	if err != nil {
+		return nil, err
+	}
+	return AbsolutePTZFParam{
+		Pan:   SteppedPosition(pan),
+		Tilt:  SteppedPosition(tilt),
+		Zoom:  SteppedRange(zoom),
+		Focus: SteppedRange(focus),
+	}, nil
+}
+func (p AbsolutePTZFParam) Valid() bool {
+	return p.Pan.Valid() && p.Tilt.Valid() && p.Zoom.Valid() && p.Focus.Valid()
+}
+func (AbsolutePTZFParam) _ptzfParameter() {}
+func init() {
+	registerParameter(func() Parameter { return AbsolutePTZFParam{} })
+}
+
+// ZoomSpeed is an arbitrary value between 0 and 32766, the higer the quicker.
+type ZoomSpeed int
+
+const ZoomSpeedMax = ZoomSpeed(32766)
+
+func (z ZoomSpeed) Valid() bool {
+	return z >= 0 && z <= ZoomSpeedMax
+}
+
+// ZoomMoveParam performs a continous zoom motion
+type ZoomMoveParam struct {
+	Direction ZoomDirection
+	Speed     ZoomSpeed
+}
+
+func (ZoomMoveParam) parameterKey() string {
+	return "ZoomMove"
+}
+func (p ZoomMoveParam) parameterValue() string {
+	return commaJoin(string(p.Direction), itoa(int(p.Speed)))
+}
+func (ZoomMoveParam) parameterParse(s string) (Parameter, error) {
+	sp := commaSplit(s)
+	if len(sp) != 2 {
+		return nil, fmt.Errorf("invalid comma-joined-list length: %d, expects 2", len(sp))
+	}
+	dir := sp[0]
+	speed, err := atoi(sp[1])
+	if err != nil {
+		return nil, err
+	}
+	return ZoomMoveParam{
+		Direction: ZoomDirection(dir),
+		Speed:     ZoomSpeed(speed),
+	}, nil
+}
+func (p ZoomMoveParam) Valid() bool {
+	return p.Direction.Valid() && p.Speed.Valid()
+}
+func (ZoomMoveParam) _ptzfParameter() {}
+func init() {
+	registerParameter(func() Parameter { return ZoomMoveParam{} })
+}
+
+type PushAFMode string
+
+const (
+	PushAFModeAF  PushAFMode = "af"
+	PushAFModeAFS PushAFMode = "af-s"
+)
+
+func (p PushAFMode) Valid() bool {
+	return p == PushAFModeAF || p == PushAFModeAFS
+}
+
+type PushAFModeParam struct {
+	Mode PushAFMode
+}
+
+func (PushAFModeParam) parameterKey() string {
+	return "PushAFMode"
+}
+func (p PushAFModeParam) parameterValue() string {
+	return string(p.Mode)
+}
+func (PushAFModeParam) parameterParse(s string) (Parameter, error) {
+	return PushAFModeParam{
+		Mode: PushAFMode(s),
+	}, nil
+}
+func (p PushAFModeParam) Valid() bool {
+	return p.Mode.Valid()
+}
+func (PushAFModeParam) _ptzfParameter() {}
+func init() {
+	registerParameter(func() Parameter { return PushAFModeParam{} })
 }
 
 //
