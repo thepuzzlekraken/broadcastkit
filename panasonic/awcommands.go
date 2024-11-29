@@ -599,8 +599,10 @@ func (a AWPanTilt) packResponse() string {
 // 4095 is the "far-end" of the range: as far-focus, tele-angle, open-iris
 type ScaleUnit int
 
+const ScaleUnitMax ScaleUnit = 4095
+
 func (s ScaleUnit) toWire() string {
-	if s > 4095 {
+	if s > ScaleUnitMax {
 		// Avoid invalid high values becoming a valid FFF
 		return "000"
 	}

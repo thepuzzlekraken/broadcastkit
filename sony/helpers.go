@@ -13,6 +13,9 @@ func commaJoin(s ...string) string {
 }
 
 func commaSplit(s string) []string {
+	if len(s) == 0 {
+		return []string{}
+	}
 	return strings.Split(s, ",")
 }
 

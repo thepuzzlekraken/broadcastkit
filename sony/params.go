@@ -57,6 +57,10 @@ func (s SteppedPosition) String() string {
 // SteppedRange is an absolute range measurement within a scale
 type SteppedRange int
 
+const SteppedRangeMax SteppedRange = 0xFFFF
+const SteppedRangeFocusMax SteppedRange = 0xFFFF
+const SteppedRangeZoomMax SteppedRange = 0x4000
+
 func (s SteppedRange) Valid() bool {
 	return (s >= 0) && (s <= 0xFFFF)
 }
@@ -510,6 +514,38 @@ func (p AbsolutePTZFParam) Valid() bool {
 func (AbsolutePTZFParam) _ptzfParameter() {}
 func init() {
 	registerParameter(func() Parameter { return AbsolutePTZFParam{} })
+}
+
+type FocusMode string
+
+const (
+	FocusModeAuto   FocusMode = "auto"
+	FocusModeManual FocusMode = "manual"
+)
+
+func (f FocusMode) Valid() bool {
+	return f == FocusModeAuto || f == FocusModeManual
+}
+
+type FocusModeParam struct {
+	Mode FocusMode
+}
+
+func (FocusModeParam) parameterKey() string {
+	return "FocusMode"
+}
+func (p FocusModeParam) parameterValue() string {
+	return string(p.Mode)
+}
+func (FocusModeParam) parameterParse(s string) (Parameter, error) {
+	return FocusModeParam{FocusMode(s)}, nil
+}
+func (p FocusModeParam) Valid() bool {
+	return p.Mode.Valid()
+}
+func (FocusModeParam) _ptzfParameter() {}
+func init() {
+	registerParameter(func() Parameter { return FocusModeParam{} })
 }
 
 // ZoomSpeed is an arbitrary value between 0 and 32766, the higer the quicker.
