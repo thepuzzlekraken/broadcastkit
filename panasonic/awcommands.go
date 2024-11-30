@@ -893,13 +893,13 @@ func (a AWFocus) packResponse() string {
 
 // AWAutoFocus configures the camera's autofocus functionality.
 type AWAutoFocus struct {
-	AutoFocus Toggle
+	Enabled Toggle
 }
 
 func init() { registerRequest(func() AWRequest { return AWAutoFocus{} }) }
 func init() { registerResponse(func() AWResponse { return AWAutoFocus{} }) }
 func (a AWAutoFocus) Acceptable() bool {
-	return a.AutoFocus.Acceptable()
+	return a.Enabled.Acceptable()
 }
 func (a AWAutoFocus) Response() AWResponse {
 	return a
@@ -909,21 +909,21 @@ func (a AWAutoFocus) requestSignature() string {
 	return "#D1\x02"
 }
 func (a AWAutoFocus) unpackRequest(cmd string) AWRequest {
-	a.AutoFocus = toToggle(cmd[3:4])
+	a.Enabled = toToggle(cmd[3:4])
 	return a
 }
 func (a AWAutoFocus) packRequest() string {
-	return "#D1" + a.AutoFocus.toWire()
+	return "#D1" + a.Enabled.toWire()
 }
 func (a AWAutoFocus) responseSignature() string {
 	return "d1\x02"
 }
 func (a AWAutoFocus) unpackResponse(cmd string) AWResponse {
-	a.AutoFocus = toToggle(cmd[2:3])
+	a.Enabled = toToggle(cmd[2:3])
 	return a
 }
 func (a AWAutoFocus) packResponse() string {
-	return "d1" + a.AutoFocus.toWire()
+	return "d1" + a.Enabled.toWire()
 }
 
 // AWAutoFocusQuery requests information about the current autofocus status.

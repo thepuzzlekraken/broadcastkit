@@ -626,6 +626,56 @@ func init() {
 	registerParameter(func() Parameter { return PushAFModeParam{} })
 }
 
+type AbsoluteFocusParam struct {
+	Position SteppedRange
+}
+
+func (AbsoluteFocusParam) parameterKey() string {
+	return "AbsoluteFocus"
+}
+func (p AbsoluteFocusParam) parameterValue() string {
+	return hex16Encoder(int(p.Position))
+}
+func (AbsoluteFocusParam) parameterParse(s string) (Parameter, error) {
+	fp, err := hex16Decoder(s)
+	if err != nil {
+		return nil, err
+	}
+	return AbsoluteFocusParam{
+		Position: SteppedRange(fp),
+	}, nil
+}
+func (p AbsoluteFocusParam) Valid() bool {
+	return p.Position.Valid()
+}
+func (AbsoluteFocusParam) _ptzfParameter() {}
+func init() {
+	registerParameter(func() Parameter { return AbsoluteFocusParam{} })
+}
+
+type FocusPushAFMFParam struct {
+	Button Button
+}
+
+func (FocusPushAFMFParam) parameterKey() string {
+	return "FocusPushAFMF"
+}
+func (p FocusPushAFMFParam) parameterValue() string {
+	return string(p.Button)
+}
+func (FocusPushAFMFParam) parameterParse(s string) (Parameter, error) {
+	return FocusPushAFMFParam{
+		Button: Button(s),
+	}, nil
+}
+func (p FocusPushAFMFParam) Valid() bool {
+	return p.Button.Valid()
+}
+func (FocusPushAFMFParam) _ptzfParameter() {}
+func init() {
+	registerParameter(func() Parameter { return FocusPushAFMFParam{} })
+}
+
 //
 // Parameters for presetpositionEndpoint
 //

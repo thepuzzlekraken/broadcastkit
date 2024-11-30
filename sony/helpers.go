@@ -102,6 +102,11 @@ func hexDecode(s string) (int, error) {
 }
 
 func hex20Decoder(h string) (int, error) {
+	if len(h) == 8 { // workaround for incorrect json-encoding
+		if h[0:3] == "000" {
+			h = h[3:]
+		}
+	}
 	if len(h) != 5 {
 		return 0, fmt.Errorf("invalid hex20 length: %d", len(h))
 	}
