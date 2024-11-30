@@ -2751,61 +2751,6 @@ func (a AWLensInformationAlternateQuery) packRequest() string {
 	return "QSI:18"
 }
 
-// AWOSDMenu configures the on-screen visible camera menu
-type AWOSDMenu struct {
-	Display Toggle
-}
-
-func init() { registerResponse(func() AWResponse { return AWOSDMenu{} }) }
-func init() { registerRequest(func() AWRequest { return AWOSDMenu{} }) }
-func (a AWOSDMenu) Acceptable() bool {
-	// 2 is undocumented but accepted
-	return a.Display > 0 && a.Display < 3
-}
-func (a AWOSDMenu) Response() AWResponse {
-	return a
-}
-func (a AWOSDMenu) requestSignature() string {
-	return "DUS:\x02"
-}
-func (a AWOSDMenu) unpackRequest(cmd string) AWRequest {
-	a.Display = toToggle(cmd[4:5])
-	return a
-}
-func (a AWOSDMenu) packRequest() string {
-	return "DUS:" + a.Display.toWire()
-}
-
-func (a AWOSDMenu) responseSignature() string {
-	return a.requestSignature()
-}
-func (a AWOSDMenu) unpackResponse(cmd string) AWResponse {
-	return a.unpackRequest(cmd).(AWResponse)
-}
-func (a AWOSDMenu) packResponse() string {
-	return a.packRequest()
-}
-
-// AWOSDMenuQuery requests an AWOSDMenu status information.
-type AWOSDMenuQuery struct{}
-
-func init() { registerRequest(func() AWRequest { return AWOSDMenuQuery{} }) }
-func (a AWOSDMenuQuery) Acceptable() bool {
-	return true
-}
-func (a AWOSDMenuQuery) Response() AWResponse {
-	return AWOSDMenu{}
-}
-func (a AWOSDMenuQuery) requestSignature() string {
-	return "QUS"
-}
-func (a AWOSDMenuQuery) unpackRequest(_ string) AWRequest {
-	return a
-}
-func (a AWOSDMenuQuery) packRequest() string {
-	return "QUS"
-}
-
 type AWTitle struct {
 	Title string
 }
@@ -3290,4 +3235,1235 @@ func (a AWPedestalQuery) unpackRequest(_ string) AWRequest {
 }
 func (a AWPedestalQuery) packRequest() string {
 	return "QTD"
+}
+
+type WhiteMode int
+
+const (
+	AutoTrackingWhite          WhiteMode = 0
+	AutoWhiteBalanceA          WhiteMode = 1
+	AutoWHiteBalanceB          WhiteMode = 2
+	AutoTrackingWhiteAlternate WhiteMode = 3
+	WhitePreset3200K           WhiteMode = 4
+	WhitePreset5600K           WhiteMode = 5
+	WhiteVariable              WhiteMode = 9
+)
+
+func (w WhiteMode) Acceptable() bool {
+	return w >= 0 && w <= 5 || w == 9
+}
+
+func (w WhiteMode) toWire() string {
+	return int2dec(int(w), 1)
+}
+
+func toWhiteMode(s string) WhiteMode {
+	return WhiteMode(dec2int(s[0:1]))
+}
+
+type AWWhiteBalanceMode struct {
+	WhiteMode WhiteMode
+}
+
+func init() { registerRequest(func() AWRequest { return AWWhiteBalanceMode{} }) }
+func init() { registerResponse(func() AWResponse { return AWWhiteBalanceMode{} }) }
+func (a AWWhiteBalanceMode) Acceptable() bool {
+	return a.WhiteMode.Acceptable()
+}
+func (a AWWhiteBalanceMode) Response() AWResponse {
+	return a
+}
+func (a AWWhiteBalanceMode) requestSignature() string {
+	return "OAW:\x02"
+}
+func (a AWWhiteBalanceMode) unpackRequest(cmd string) AWRequest {
+	a.WhiteMode = toWhiteMode(cmd[4:5])
+	return a
+}
+func (a AWWhiteBalanceMode) packRequest() string {
+	return "OAW:" + a.WhiteMode.toWire()
+}
+func (a AWWhiteBalanceMode) responseSignature() string {
+	return a.requestSignature()
+}
+func (a AWWhiteBalanceMode) unpackResponse(cmd string) AWResponse {
+	return a.unpackRequest(cmd).(AWResponse)
+}
+func (a AWWhiteBalanceMode) packResponse() string {
+	return a.packRequest()
+}
+
+type AWWhiteBalanceModeQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return AWWhiteBalanceModeQuery{} }) }
+func (a AWWhiteBalanceModeQuery) Acceptable() bool {
+	return true
+}
+func (a AWWhiteBalanceModeQuery) Response() AWResponse {
+	return AWWhiteBalanceMode{}
+}
+func (a AWWhiteBalanceModeQuery) requestSignature() string {
+	return "QAW"
+}
+func (a AWWhiteBalanceModeQuery) unpackRequest(_ string) AWRequest {
+	return AWWhiteBalanceModeQuery{}
+}
+func (a AWWhiteBalanceModeQuery) packRequest() string {
+	return "QAW"
+}
+
+type ShutterMode int
+
+const (
+	ShutterOff        = 0x0
+	Shutter1o60       = 0x2
+	Shutter1o100      = 0x3
+	Shutter1o120      = 0x4
+	Shutter1o250      = 0x5
+	Shutter1o500      = 0x6
+	Shutter1o1000     = 0x7
+	Shutter1o2000     = 0x8
+	Shutter1o4000     = 0x9
+	Shutter1o10000    = 0xA
+	ShutterSyncroScan = 0xB
+	ShutterELC        = 0xC
+	Shutter1o24       = 0xD
+	Shutter1o25       = 0xE
+	Shutter1o30       = 0xF
+)
+
+func (s ShutterMode) Acceptable() bool {
+	return s >= 0 && s <= 0xF
+}
+func (s ShutterMode) toWire() string {
+	return int2hex(int(s), 1)
+}
+func toShutterMode(s string) ShutterMode {
+	return ShutterMode(hex2int(s[0:1]))
+}
+
+type AWShutterMode struct {
+	quirk       bool
+	ShutterMode ShutterMode
+}
+
+func init() { registerRequest(func() AWRequest { return AWShutterMode{} }) }
+func init() { registerResponse(func() AWResponse { return AWShutterMode{} }) }
+func init() { registerResponse(func() AWResponse { return AWShutterMode{quirk: true} }) }
+func (a AWShutterMode) Acceptable() bool {
+	return a.ShutterMode.Acceptable()
+}
+func (a AWShutterMode) Response() AWResponse {
+	return a
+}
+func (a AWShutterMode) requestSignature() string {
+	return "OSH:\x01"
+}
+func (a AWShutterMode) unpackRequest(cmd string) AWRequest {
+	a.ShutterMode = toShutterMode(cmd[4:5])
+	return a
+}
+func (a AWShutterMode) packRequest() string {
+	return "OSH:" + a.ShutterMode.toWire()
+}
+func (a AWShutterMode) responseSignature() string {
+	if a.quirk {
+		return "OSH:0x\x01"
+	}
+	return a.requestSignature()
+}
+func (a AWShutterMode) unpackResponse(cmd string) AWResponse {
+	if a.quirk {
+		a.ShutterMode = ShutterMode(hex2int(cmd[6:7]))
+		return a
+	}
+	return a.unpackRequest(cmd).(AWResponse)
+}
+func (a AWShutterMode) packResponse() string {
+	if a.quirk {
+		return "OSH:0x" + a.ShutterMode.toWire()
+	}
+	return a.packRequest()
+}
+func (a AWShutterMode) packingQuirk(m quirkMode) AWResponse {
+	a.quirk = (m == quirkBatch)
+	return a
+}
+
+type AWShutterModeQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return AWShutterModeQuery{} }) }
+func (a AWShutterModeQuery) Acceptable() bool {
+	return true
+}
+func (a AWShutterModeQuery) Response() AWResponse {
+	return AWShutterMode{}
+}
+func (a AWShutterModeQuery) requestSignature() string {
+	return "QSH"
+}
+func (a AWShutterModeQuery) unpackRequest(_ string) AWRequest {
+	return AWShutterModeQuery{}
+}
+func (a AWShutterModeQuery) packRequest() string {
+	return "QSH"
+}
+
+type DetailLevel int
+
+const (
+	DetailOff  DetailLevel = 0
+	DetailLow  DetailLevel = 1
+	DetailHigh DetailLevel = 2
+)
+
+func (d DetailLevel) Acceptable() bool {
+	return d >= 0 && d <= 2
+}
+func (d DetailLevel) toWire() string {
+	return int2dec(int(d), 1)
+}
+func toDetailLevel(s string) DetailLevel {
+	return DetailLevel(dec2int(s[0:1]))
+}
+
+type AWDetail struct {
+	Detail DetailLevel
+}
+
+func init() { registerRequest(func() AWRequest { return AWDetail{} }) }
+func init() { registerResponse(func() AWResponse { return AWDetail{} }) }
+func (a AWDetail) Acceptable() bool {
+	return a.Detail.Acceptable()
+}
+func (a AWDetail) Response() AWResponse {
+	return a
+}
+func (a AWDetail) requestSignature() string {
+	return "ODT:\x02"
+}
+func (a AWDetail) unpackRequest(cmd string) AWRequest {
+	a.Detail = toDetailLevel(cmd[4:5])
+	return a
+}
+func (a AWDetail) packRequest() string {
+	return "ODT:" + a.Detail.toWire()
+}
+func (a AWDetail) responseSignature() string {
+	return a.requestSignature()
+}
+func (a AWDetail) unpackResponse(cmd string) AWResponse {
+	return a.unpackRequest(cmd).(AWResponse)
+}
+func (a AWDetail) packResponse() string {
+	return a.packRequest()
+}
+
+type AWDetailQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return AWDetailQuery{} }) }
+func (a AWDetailQuery) Acceptable() bool {
+	return true
+}
+func (a AWDetailQuery) Response() AWResponse {
+	return AWDetail{}
+}
+func (a AWDetailQuery) requestSignature() string {
+	return "QDT"
+}
+func (a AWDetailQuery) unpackRequest(_ string) AWRequest {
+	return AWDetailQuery{}
+}
+func (a AWDetailQuery) packRequest() string {
+	return "QDT"
+}
+
+type AWSceneSet struct {
+	Scene int
+}
+
+func init() { registerRequest(func() AWRequest { return AWSceneSet{} }) }
+func init() { registerResponse(func() AWResponse { return AWSceneSet{} }) }
+func (a AWSceneSet) Acceptable() bool {
+	return a.Scene >= 0 && a.Scene < 10
+}
+func (a AWSceneSet) Response() AWResponse {
+	return a
+}
+func (a AWSceneSet) requestSignature() string {
+	return "XSF:\x02"
+}
+func (a AWSceneSet) unpackRequest(cmd string) AWRequest {
+	a.Scene = dec2int(cmd[4:5])
+	return a
+}
+func (a AWSceneSet) packRequest() string {
+	return "XSF:" + int2dec(a.Scene, 1)
+}
+func (a AWSceneSet) responseSignature() string {
+	return a.requestSignature()
+}
+func (a AWSceneSet) unpackResponse(cmd string) AWResponse {
+	return a.unpackRequest(cmd).(AWResponse)
+}
+func (a AWSceneSet) packResponse() string {
+	return a.packRequest()
+}
+
+type AWSceneQuery struct {
+	Scene int
+}
+
+func init() { registerRequest(func() AWRequest { return AWSceneQuery{} }) }
+func init() { registerResponse(func() AWResponse { return AWSceneQuery{} }) }
+func (a AWSceneQuery) Acceptable() bool {
+	return a.Scene >= 0 && a.Scene < 10
+}
+func (a AWSceneQuery) Response() AWResponse {
+	return AWSceneQuery{}
+}
+func (a AWSceneQuery) requestSignature() string {
+	return "QSF"
+}
+func (a AWSceneQuery) unpackRequest(_ string) AWRequest {
+	return AWSceneQuery{}
+}
+func (a AWSceneQuery) packRequest() string {
+	return "QSF"
+}
+func (a AWSceneQuery) responseSignature() string {
+	return "OSF:\x02"
+}
+func (a AWSceneQuery) unpackResponse(cmd string) AWResponse {
+	a.Scene = dec2int(cmd[4:5])
+	return a
+}
+func (a AWSceneQuery) packResponse() string {
+	return "OSF:" + int2dec(a.Scene, 1)
+}
+
+type AWColorBarSet struct {
+	Enable Toggle
+}
+
+func init() { registerRequest(func() AWRequest { return AWColorBarSet{} }) }
+func init() { registerResponse(func() AWResponse { return AWColorBarSet{} }) }
+func (a AWColorBarSet) Acceptable() bool {
+	return a.Enable.Acceptable()
+}
+func (a AWColorBarSet) Response() AWResponse {
+	return a
+}
+func (a AWColorBarSet) requestSignature() string {
+	return "DCB:\x02"
+}
+func (a AWColorBarSet) unpackRequest(cmd string) AWRequest {
+	a.Enable = toToggle(cmd[4:5])
+	return a
+}
+func (a AWColorBarSet) packRequest() string {
+	return "DCB:" + a.Enable.toWire()
+}
+func (a AWColorBarSet) responseSignature() string {
+	return a.requestSignature()
+}
+func (a AWColorBarSet) unpackResponse(cmd string) AWResponse {
+	return a.unpackRequest(cmd).(AWResponse)
+}
+func (a AWColorBarSet) packResponse() string {
+	return a.packRequest()
+}
+
+type AWColorBarQuery struct {
+	Enable Toggle
+}
+
+func init() { registerRequest(func() AWRequest { return AWColorBarQuery{} }) }
+func init() { registerResponse(func() AWResponse { return AWColorBarQuery{} }) }
+func (a AWColorBarQuery) Acceptable() bool {
+	return true
+}
+func (a AWColorBarQuery) Response() AWResponse {
+	return a
+}
+func (a AWColorBarQuery) requestSignature() string {
+	return "QBR"
+}
+func (a AWColorBarQuery) unpackRequest(_ string) AWRequest {
+	return AWColorBarQuery{}
+}
+func (a AWColorBarQuery) packRequest() string {
+	return "QBR"
+}
+func (a AWColorBarQuery) responseSignature() string {
+	return "OBR:\x02"
+}
+func (a AWColorBarQuery) unpackResponse(cmd string) AWResponse {
+	a.Enable = toToggle(cmd[4:5])
+	return a
+}
+func (a AWColorBarQuery) packResponse() string {
+	return "OBR:" + a.Enable.toWire()
+}
+
+type PresetMode int
+
+const (
+	PresetModeA PresetMode = iota
+	PresetModeB
+	PresetModeC
+)
+
+func (m PresetMode) Valid() bool {
+	return m == PresetModeA || m == PresetModeB || m == PresetModeC
+}
+func (m PresetMode) toWire() string {
+	return int2dec(int(m), 1)
+}
+func toPresetMode(s string) PresetMode {
+	return PresetMode(dec2int(s[0:1]))
+}
+
+type AWPresetMode struct {
+	Mode PresetMode
+}
+
+func init() { registerRequest(func() AWRequest { return AWPresetMode{} }) }
+func init() { registerResponse(func() AWResponse { return AWPresetMode{} }) }
+func (a AWPresetMode) Acceptable() bool {
+	return a.Mode.Valid()
+}
+func (a AWPresetMode) Response() AWResponse {
+	return a
+}
+func (a AWPresetMode) requestSignature() string {
+	return "OSE:71:\x02"
+}
+func (a AWPresetMode) unpackRequest(cmd string) AWRequest {
+	a.Mode = toPresetMode(cmd[7:8])
+	return a
+}
+func (a AWPresetMode) packRequest() string {
+	return "OSE:71:" + a.Mode.toWire()
+}
+func (a AWPresetMode) responseSignature() string {
+	return a.requestSignature()
+}
+func (a AWPresetMode) unpackResponse(cmd string) AWResponse {
+	return a.unpackRequest(cmd).(AWResponse)
+}
+func (a AWPresetMode) packResponse() string {
+	return a.packRequest()
+}
+
+type AWPresetModeQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return AWPresetModeQuery{} }) }
+func (a AWPresetModeQuery) Acceptable() bool {
+	return true
+}
+func (a AWPresetModeQuery) Response() AWResponse {
+	return AWPresetMode{}
+}
+func (a AWPresetModeQuery) requestSignature() string {
+	return "QSE:71"
+}
+func (a AWPresetModeQuery) unpackRequest(_ string) AWRequest {
+	return AWPresetModeQuery{}
+}
+func (a AWPresetModeQuery) packRequest() string {
+	return "QSE:71"
+}
+
+type AWOSDSet struct {
+	Enable Toggle
+}
+
+func init() { registerRequest(func() AWRequest { return AWOSDSet{} }) }
+func init() { registerResponse(func() AWResponse { return AWOSDSet{} }) }
+func (a AWOSDSet) Acceptable() bool {
+	return a.Enable.Acceptable()
+}
+func (a AWOSDSet) Response() AWResponse {
+	return a
+}
+func (a AWOSDSet) requestSignature() string {
+	return "DUS:\x02"
+}
+func (a AWOSDSet) unpackRequest(cmd string) AWRequest {
+	a.Enable = toToggle(cmd[4:5])
+	return a
+}
+func (a AWOSDSet) packRequest() string {
+	return "DUS:" + a.Enable.toWire()
+}
+func (a AWOSDSet) responseSignature() string {
+	return a.requestSignature()
+}
+func (a AWOSDSet) unpackResponse(cmd string) AWResponse {
+	return a.unpackRequest(cmd).(AWResponse)
+}
+func (a AWOSDSet) packResponse() string {
+	return a.packRequest()
+}
+
+type AWOSDQuery struct {
+	Enable Toggle
+}
+
+func init() { registerRequest(func() AWRequest { return AWOSDQuery{} }) }
+func init() { registerResponse(func() AWResponse { return AWOSDQuery{} }) }
+func (a AWOSDQuery) Acceptable() bool {
+	return true
+}
+func (a AWOSDQuery) Response() AWResponse {
+	return a
+}
+func (a AWOSDQuery) requestSignature() string {
+	return "QUS"
+}
+func (a AWOSDQuery) unpackRequest(_ string) AWRequest {
+	return AWOSDQuery{}
+}
+func (a AWOSDQuery) packRequest() string {
+	return "QUS"
+}
+func (a AWOSDQuery) responseSignature() string {
+	return "OUS:\x02"
+}
+func (a AWOSDQuery) unpackResponse(cmd string) AWResponse {
+	a.Enable = toToggle(cmd[4:5])
+	return a
+}
+func (a AWOSDQuery) packResponse() string {
+	return "OUS:" + a.Enable.toWire()
+}
+
+// AWTotalDetail is a camera-dependent detail configuration
+type AWTotalDetail struct {
+	Detail int
+}
+
+func init() { registerRequest(func() AWRequest { return AWTotalDetail{} }) }
+func init() { registerResponse(func() AWResponse { return AWTotalDetail{} }) }
+func (a AWTotalDetail) Acceptable() bool {
+	return a.Detail >= -0x80 && a.Detail <= 0x7F
+}
+func (a AWTotalDetail) Response() AWResponse {
+	return a
+}
+func (a AWTotalDetail) requestSignature() string {
+	return "OSA:30:\x01\x01"
+}
+func (a AWTotalDetail) unpackRequest(cmd string) AWRequest {
+	a.Detail = hex2int(cmd[7:9]) - 0x80
+	return a
+}
+func (a AWTotalDetail) packRequest() string {
+	return "OSA:30:" + int2hex(a.Detail+0x80, 2)
+}
+func (a AWTotalDetail) responseSignature() string {
+	return a.requestSignature()
+}
+func (a AWTotalDetail) unpackResponse(cmd string) AWResponse {
+	return a.unpackRequest(cmd).(AWResponse)
+}
+func (a AWTotalDetail) packResponse() string {
+	return a.packRequest()
+}
+
+type AWTotalDetailQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return AWTotalDetailQuery{} }) }
+func (a AWTotalDetailQuery) Acceptable() bool {
+	return true
+}
+func (a AWTotalDetailQuery) Response() AWResponse {
+	return AWTotalDetail{}
+}
+func (a AWTotalDetailQuery) requestSignature() string {
+	return "QSA:30"
+}
+func (a AWTotalDetailQuery) unpackRequest(_ string) AWRequest {
+	return AWTotalDetailQuery{}
+}
+func (a AWTotalDetailQuery) packRequest() string {
+	return "QSA:30"
+}
+
+type AWNDFilterFlag struct{}
+
+func init() { registerResponse(func() AWResponse { return AWNDFilterFlag{} }) }
+func (a AWNDFilterFlag) responseSignature() string {
+	return "d20"
+}
+func (a AWNDFilterFlag) unpackResponse(_ string) AWResponse {
+	return a
+}
+func (a AWNDFilterFlag) packResponse() string {
+	return "d20"
+}
+
+type AWLampFlag struct{}
+
+func init() { registerResponse(func() AWResponse { return AWLampFlag{} }) }
+func (a AWLampFlag) responseSignature() string {
+	return "d40"
+}
+func (a AWLampFlag) unpackResponse(_ string) AWResponse {
+	return a
+}
+func (a AWLampFlag) packResponse() string {
+	return "d40"
+}
+
+type ErrorInfoBits uint
+
+const (
+	ErrorInfoFan   = 0b1
+	ErrorInfoOther = 0b10
+)
+
+type AWERrorInformation struct {
+	Info ErrorInfoBits
+}
+
+func init() { registerRequest(func() AWRequest { return AWERrorInformation{} }) }
+func init() { registerResponse(func() AWResponse { return AWERrorInformation{} }) }
+func (a AWERrorInformation) Acceptable() bool {
+	return a.Info < 10
+}
+func (a AWERrorInformation) Response() AWResponse {
+	return a
+}
+func (a AWERrorInformation) requestSignature() string {
+	return "OER:\x02"
+}
+func (a AWERrorInformation) unpackRequest(cmd string) AWRequest {
+	a.Info = ErrorInfoBits(dec2int(cmd[4:5]))
+	return a
+}
+func (a AWERrorInformation) packRequest() string {
+	return "OER:" + int2dec(int(a.Info), 1)
+}
+func (a AWERrorInformation) responseSignature() string {
+	return a.requestSignature()
+}
+func (a AWERrorInformation) unpackResponse(cmd string) AWResponse {
+	return a.unpackRequest(cmd).(AWResponse)
+}
+func (a AWERrorInformation) packResponse() string {
+	return a.packRequest()
+}
+
+type AWPresetFlag struct{}
+
+func init() { registerResponse(func() AWResponse { return AWPresetFlag{} }) }
+
+func (a AWPresetFlag) responseSignature() string {
+	return "rt1"
+}
+func (a AWPresetFlag) unpackResponse(_ string) AWResponse {
+	return a
+}
+func (a AWPresetFlag) packResponse() string {
+	return "rt1"
+}
+
+type AWLimitUp struct {
+	Enable Toggle
+}
+
+func init() { registerRequest(func() AWRequest { return AWLimitUp{} }) }
+func init() { registerResponse(func() AWResponse { return AWLimitUp{} }) }
+func (a AWLimitUp) Acceptable() bool {
+	return a.Enable.Acceptable()
+}
+func (a AWLimitUp) Response() AWResponse {
+	return a
+}
+func (a AWLimitUp) requestSignature() string {
+	return "#LC1\x02"
+}
+func (a AWLimitUp) unpackRequest(cmd string) AWRequest {
+	a.Enable = toToggle(cmd[4:5])
+	return a
+}
+func (a AWLimitUp) packRequest() string {
+	return "#LC1" + a.Enable.toWire()
+}
+func (a AWLimitUp) responseSignature() string {
+	return "lC1\x02"
+}
+func (a AWLimitUp) unpackResponse(cmd string) AWResponse {
+	a.Enable = toToggle(cmd[3:4])
+	return a
+}
+func (a AWLimitUp) packResponse() string {
+	return "lC1" + a.Enable.toWire()
+}
+
+type AWLimitDown struct {
+	Enable Toggle
+}
+
+func init() { registerRequest(func() AWRequest { return AWLimitDown{} }) }
+func init() { registerResponse(func() AWResponse { return AWLimitDown{} }) }
+func (a AWLimitDown) Acceptable() bool {
+	return a.Enable.Acceptable()
+}
+func (a AWLimitDown) Response() AWResponse {
+	return a
+}
+func (a AWLimitDown) requestSignature() string {
+	return "#LC2\x02"
+}
+func (a AWLimitDown) unpackRequest(cmd string) AWRequest {
+	a.Enable = toToggle(cmd[4:5])
+	return a
+}
+func (a AWLimitDown) packRequest() string {
+	return "#LC2" + a.Enable.toWire()
+}
+func (a AWLimitDown) responseSignature() string {
+	return "lC2\x02"
+}
+func (a AWLimitDown) unpackResponse(cmd string) AWResponse {
+	a.Enable = toToggle(cmd[3:4])
+	return a
+}
+func (a AWLimitDown) packResponse() string {
+	return "lC2" + a.Enable.toWire()
+}
+
+type AWLimitLeft struct {
+	Enable Toggle
+}
+
+func init() { registerRequest(func() AWRequest { return AWLimitLeft{} }) }
+func init() { registerResponse(func() AWResponse { return AWLimitLeft{} }) }
+func (a AWLimitLeft) Acceptable() bool {
+	return a.Enable.Acceptable()
+}
+func (a AWLimitLeft) Response() AWResponse {
+	return a
+}
+func (a AWLimitLeft) requestSignature() string {
+	return "#LC3\x02"
+}
+func (a AWLimitLeft) unpackRequest(cmd string) AWRequest {
+	a.Enable = toToggle(cmd[4:5])
+	return a
+}
+func (a AWLimitLeft) packRequest() string {
+	return "#LC3" + a.Enable.toWire()
+}
+func (a AWLimitLeft) responseSignature() string {
+	return "lC3\x02"
+}
+func (a AWLimitLeft) unpackResponse(cmd string) AWResponse {
+	a.Enable = toToggle(cmd[3:4])
+	return a
+}
+func (a AWLimitLeft) packResponse() string {
+	return "lC3" + a.Enable.toWire()
+}
+
+type AWLimitRight struct {
+	Enable Toggle
+}
+
+func init() { registerRequest(func() AWRequest { return AWLimitRight{} }) }
+func init() { registerResponse(func() AWResponse { return AWLimitRight{} }) }
+func (a AWLimitRight) Acceptable() bool {
+	return a.Enable.Acceptable()
+}
+func (a AWLimitRight) Response() AWResponse {
+	return a
+}
+func (a AWLimitRight) requestSignature() string {
+	return "#LC4\x02"
+}
+func (a AWLimitRight) unpackRequest(cmd string) AWRequest {
+	a.Enable = toToggle(cmd[4:5])
+	return a
+}
+func (a AWLimitRight) packRequest() string {
+	return "#LC4" + a.Enable.toWire()
+}
+func (a AWLimitRight) responseSignature() string {
+	return "lC4\x02"
+}
+func (a AWLimitRight) unpackResponse(cmd string) AWResponse {
+	a.Enable = toToggle(cmd[3:4])
+	return a
+}
+func (a AWLimitRight) packResponse() string {
+	return "lC4" + a.Enable.toWire()
+}
+
+type AWRGainControl struct {
+	quirk bool
+	Gain  int
+}
+
+func init() { registerRequest(func() AWRequest { return AWRGainControl{} }) }
+func init() { registerResponse(func() AWResponse { return AWRGainControl{} }) }
+func init() { registerResponse(func() AWResponse { return AWRGainControl{quirk: true} }) }
+func (a AWRGainControl) Acceptable() bool {
+	return a.Gain >= -30 && a.Gain <= 30
+}
+func (a AWRGainControl) Response() AWResponse {
+	return a
+}
+func (a AWRGainControl) requestSignature() string {
+	return "ORG:\x01\x01"
+}
+func (a AWRGainControl) unpackRequest(cmd string) AWRequest {
+	a.Gain = hex2int(cmd[4:6]) - 0x1E
+	return a
+}
+func (a AWRGainControl) packRequest() string {
+	if a.Gain < -30 {
+		a.Gain = -30
+	}
+	return "ORG:" + int2hex(a.Gain+0x1E, 2)
+}
+func (a AWRGainControl) responseSignature() string {
+	if a.quirk {
+		return "ORG:0x\x01\x01"
+	}
+	return a.requestSignature()
+}
+func (a AWRGainControl) unpackResponse(cmd string) AWResponse {
+	if a.quirk {
+		a.Gain = hex2int(cmd[6:8]) - 0x1E
+		return a
+	}
+	a.Gain = hex2int(cmd[4:6]) - 0x1E
+	return a
+}
+func (a AWRGainControl) packResponse() string {
+	if a.quirk {
+		// The ORG:0 -> unavailable quirk case is not handled properly.
+		return "ORG:0x" + int2hex(a.Gain+0x1E, 2)
+	}
+	return "ORG:" + int2hex(a.Gain+0x1E, 2)
+}
+func (a AWRGainControl) packingQuirk(m quirkMode) AWResponse {
+	a.quirk = (m == quirkBatch)
+	return a
+}
+
+type AWRGainDisabled struct{}
+
+func init() { registerResponse(func() AWResponse { return AWRGainDisabled{} }) }
+func (a AWRGainDisabled) responseSignature() string {
+	return "ORG:0"
+}
+func (a AWRGainDisabled) unpackResponse(_ string) AWResponse {
+	return a
+}
+func (a AWRGainDisabled) packResponse() string {
+	return "ORG:0"
+}
+
+type AWRGainQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return AWRGainQuery{} }) }
+func (a AWRGainQuery) Acceptable() bool {
+	return true
+}
+func (a AWRGainQuery) Response() AWResponse {
+	return AWRGainControl{}
+}
+func (a AWRGainQuery) requestSignature() string {
+	return "QGR"
+}
+func (a AWRGainQuery) unpackRequest(_ string) AWRequest {
+	return a
+}
+func (a AWRGainQuery) packRequest() string {
+	return "QGR"
+}
+
+type AWBGainControl struct {
+	quirk bool
+	Gain  int
+}
+
+func init() { registerRequest(func() AWRequest { return AWBGainControl{} }) }
+func init() { registerResponse(func() AWResponse { return AWBGainControl{} }) }
+func init() { registerResponse(func() AWResponse { return AWBGainControl{quirk: true} }) }
+func (a AWBGainControl) Acceptable() bool {
+	return a.Gain >= -30 && a.Gain <= 30
+}
+func (a AWBGainControl) Response() AWResponse {
+	return a
+}
+func (a AWBGainControl) requestSignature() string {
+	return "OBG:\x01\x01"
+}
+func (a AWBGainControl) unpackRequest(cmd string) AWRequest {
+	a.Gain = hex2int(cmd[4:6]) - 0x1E
+	return a
+}
+func (a AWBGainControl) packRequest() string {
+	if a.Gain < -30 {
+		a.Gain = -30
+	}
+	return "OBG:" + int2hex(a.Gain+0x1E, 2)
+}
+func (a AWBGainControl) responseSignature() string {
+	if a.quirk {
+		return "OBG:0x\x01\x01"
+	}
+	return a.requestSignature()
+}
+func (a AWBGainControl) unpackResponse(cmd string) AWResponse {
+	if a.quirk {
+		a.Gain = hex2int(cmd[6:8]) - 0x1E
+		return a
+	}
+	a.Gain = hex2int(cmd[4:6]) - 0x1E
+	return a
+}
+func (a AWBGainControl) packResponse() string {
+	if a.quirk {
+		// The ORG:0 -> unavailable quirk case is not handled properly.
+		return "OBG:0x" + int2hex(a.Gain+0x1E, 2)
+	}
+	return "OBG:" + int2hex(a.Gain+0x1E, 2)
+}
+func (a AWBGainControl) packingQuirk(m quirkMode) AWResponse {
+	a.quirk = (m == quirkBatch)
+	return a
+}
+
+type AWBGainDisabled struct{}
+
+func init() { registerResponse(func() AWResponse { return AWBGainDisabled{} }) }
+func (a AWBGainDisabled) responseSignature() string {
+	return "OBG:0"
+}
+func (a AWBGainDisabled) unpackResponse(_ string) AWResponse {
+	return a
+}
+func (a AWBGainDisabled) packResponse() string {
+	return "OBG:0"
+}
+
+type AWBGainQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return AWRGainQuery{} }) }
+func (a AWBGainQuery) Acceptable() bool {
+	return true
+}
+func (a AWBGainQuery) Response() AWResponse {
+	return AWRGainControl{}
+}
+func (a AWBGainQuery) requestSignature() string {
+	return "QGB"
+}
+func (a AWBGainQuery) unpackRequest(_ string) AWRequest {
+	return a
+}
+func (a AWBGainQuery) packRequest() string {
+	return "QGB"
+}
+
+type ColorTemp int
+
+func (c ColorTemp) K() int {
+	return int(c)*100 + 2000
+}
+func ToColorTemp(k int) ColorTemp {
+	c := ColorTemp((k - 2000) / 100)
+	if k%100 >= 50 {
+		c += 1 // mathematical rounding
+	}
+	return c
+}
+
+type AWColorTemp struct {
+	quirk bool
+	Temp  ColorTemp
+}
+
+func init() { registerRequest(func() AWRequest { return AWColorTemp{} }) }
+func init() { registerResponse(func() AWResponse { return AWColorTemp{} }) }
+func init() { registerResponse(func() AWResponse { return AWColorTemp{quirk: true} }) }
+func (a AWColorTemp) Acceptable() bool {
+	return a.Temp >= 0 && a.Temp <= 0x078
+}
+func (a AWColorTemp) Response() AWResponse {
+	return a
+}
+func (a AWColorTemp) requestSignature() string {
+	return "OSD:B1:\x01\x01\x01"
+}
+func (a AWColorTemp) unpackRequest(cmd string) AWRequest {
+	a.Temp = ColorTemp(hex2int(cmd[7:10]))
+	return a
+}
+func (a AWColorTemp) packRequest() string {
+	return "OSD:B1:" + int2hex(int(a.Temp), 3)
+}
+func (a AWColorTemp) responseSignature() string {
+	if a.quirk {
+		return "OSD:B1:0x\x01\x01\x01"
+	}
+	return a.requestSignature()
+}
+func (a AWColorTemp) unpackResponse(cmd string) AWResponse {
+	if a.quirk {
+		a.Temp = ColorTemp(hex2int(cmd[9:12]))
+		return a
+	}
+	return a.unpackRequest(cmd).(AWResponse)
+}
+func (a AWColorTemp) packResponse() string {
+	if a.quirk {
+		return "OSD:B1:0x" + int2hex(int(a.Temp), 3)
+	}
+	return a.packRequest()
+}
+func (a AWColorTemp) packingQuirk(m quirkMode) AWResponse {
+	a.quirk = (m == quirkBatch)
+	return a
+}
+
+type AWColorTempQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return AWColorTempQuery{} }) }
+func (a AWColorTempQuery) Acceptable() bool {
+	return true
+}
+func (a AWColorTempQuery) Response() AWResponse {
+	return AWColorTemp{}
+}
+func (a AWColorTempQuery) requestSignature() string {
+	return "OSD:B1"
+}
+func (a AWColorTempQuery) unpackRequest(_ string) AWRequest {
+	return a
+}
+func (a AWColorTempQuery) packRequest() string {
+	return "OSD:B1"
+}
+
+type OisToggle int
+
+const (
+	OisOff    OisToggle = 0
+	OisOn     OisToggle = 1
+	OisAlsoOn OisToggle = 2 // ¯\_(ツ)_/¯ just panasonic...
+)
+
+func (o OisToggle) Acceptable() bool {
+	return o == OisOff || o == OisOn || o == OisAlsoOn
+}
+
+type AWImageStabilization struct {
+	On OisToggle
+}
+
+func init() { registerRequest(func() AWRequest { return AWImageStabilization{} }) }
+func init() { registerResponse(func() AWResponse { return AWImageStabilization{} }) }
+func (a AWImageStabilization) Acceptable() bool {
+	return a.On.Acceptable()
+}
+func (a AWImageStabilization) Response() AWResponse {
+	return a
+}
+func (a AWImageStabilization) requestSignature() string {
+	return "OIS:\x02"
+}
+func (a AWImageStabilization) unpackRequest(cmd string) AWRequest {
+	a.On = OisToggle(dec2int(cmd[4:5]))
+	return a
+}
+func (a AWImageStabilization) packRequest() string {
+	return "OIS:" + int2dec(int(a.On), 1)
+}
+func (a AWImageStabilization) responseSignature() string {
+	return a.requestSignature()
+}
+func (a AWImageStabilization) unpackResponse(cmd string) AWResponse {
+	return a.unpackRequest(cmd).(AWResponse)
+}
+func (a AWImageStabilization) packResponse() string {
+	return a.packRequest()
+}
+
+type AWImageStabilizationQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return AWImageStabilizationQuery{} }) }
+func (a AWImageStabilizationQuery) Acceptable() bool {
+	return true
+}
+func (a AWImageStabilizationQuery) Response() AWResponse {
+	return AWImageStabilization{}
+}
+func (a AWImageStabilizationQuery) requestSignature() string {
+	return "QIS"
+}
+func (a AWImageStabilizationQuery) unpackRequest(_ string) AWRequest {
+	return a
+}
+func (a AWImageStabilizationQuery) packRequest() string {
+	return "QIS"
+}
+
+type AWDigitalZoom struct {
+	On Toggle
+}
+
+func init() { registerRequest(func() AWRequest { return AWDigitalZoom{} }) }
+func init() { registerResponse(func() AWResponse { return AWDigitalZoom{} }) }
+func (a AWDigitalZoom) Acceptable() bool {
+	return a.On.Acceptable()
+}
+func (a AWDigitalZoom) Response() AWResponse {
+	return a
+}
+func (a AWDigitalZoom) requestSignature() string {
+	return "OSE:70:\x02"
+}
+func (a AWDigitalZoom) unpackRequest(cmd string) AWRequest {
+	a.On = Toggle(dec2int(cmd[7:8]))
+	return a
+}
+func (a AWDigitalZoom) packRequest() string {
+	return "OSE:70:" + int2dec(int(a.On), 1)
+}
+func (a AWDigitalZoom) responseSignature() string {
+	return a.requestSignature()
+}
+func (a AWDigitalZoom) unpackResponse(cmd string) AWResponse {
+	return a.unpackRequest(cmd).(AWResponse)
+}
+func (a AWDigitalZoom) packResponse() string {
+	return a.packRequest()
+}
+
+type AWDigitalZoomQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return AWDigitalZoomQuery{} }) }
+func (a AWDigitalZoomQuery) Acceptable() bool {
+	return true
+}
+func (a AWDigitalZoomQuery) Response() AWResponse {
+	return AWDigitalZoom{}
+}
+func (a AWDigitalZoomQuery) requestSignature() string {
+	return "QSE:70"
+}
+func (a AWDigitalZoomQuery) unpackRequest(_ string) AWRequest {
+	return a
+}
+func (a AWDigitalZoomQuery) packRequest() string {
+	return "QSE:70"
+}
+
+type AWiZoom struct {
+	On Toggle
+}
+
+func init() { registerRequest(func() AWRequest { return AWiZoom{} }) }
+func init() { registerResponse(func() AWResponse { return AWiZoom{} }) }
+func (a AWiZoom) Acceptable() bool {
+	return a.On.Acceptable()
+}
+func (a AWiZoom) Response() AWResponse {
+	return a
+}
+func (a AWiZoom) requestSignature() string {
+	return "OSD:B3:\x02"
+}
+func (a AWiZoom) unpackRequest(cmd string) AWRequest {
+	a.On = Toggle(dec2int(cmd[7:8]))
+	return a
+}
+func (a AWiZoom) packRequest() string {
+	return "OSD:B3:" + int2dec(int(a.On), 1)
+}
+func (a AWiZoom) responseSignature() string {
+	return a.requestSignature()
+}
+func (a AWiZoom) unpackResponse(cmd string) AWResponse {
+	return a.unpackRequest(cmd).(AWResponse)
+}
+func (a AWiZoom) packResponse() string {
+	return a.packRequest()
+}
+
+type AWiZoomQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return AWiZoomQuery{} }) }
+func (a AWiZoomQuery) Acceptable() bool {
+	return true
+}
+func (a AWiZoomQuery) Response() AWResponse {
+	return AWiZoom{}
+}
+func (a AWiZoomQuery) requestSignature() string {
+	return "QSD:B3"
+}
+func (a AWiZoomQuery) unpackRequest(_ string) AWRequest {
+	return a
+}
+func (a AWiZoomQuery) packRequest() string {
+	return "QSD:B3"
+}
+
+type AWDigitalExtender struct {
+	On Toggle
+}
+
+func init() { registerRequest(func() AWRequest { return AWDigitalExtender{} }) }
+func init() { registerResponse(func() AWResponse { return AWDigitalExtender{} }) }
+func (a AWDigitalExtender) Acceptable() bool {
+	return a.On.Acceptable()
+}
+func (a AWDigitalExtender) Response() AWResponse {
+	return a
+}
+func (a AWDigitalExtender) requestSignature() string {
+	return "ODE:\x02"
+}
+func (a AWDigitalExtender) unpackRequest(cmd string) AWRequest {
+	a.On = Toggle(dec2int(cmd[4:5]))
+	return a
+}
+func (a AWDigitalExtender) packRequest() string {
+	return "ODE:" + int2dec(int(a.On), 1)
+}
+func (a AWDigitalExtender) responseSignature() string {
+	return a.requestSignature()
+}
+func (a AWDigitalExtender) unpackResponse(cmd string) AWResponse {
+	return a.unpackRequest(cmd).(AWResponse)
+}
+func (a AWDigitalExtender) packResponse() string {
+	return a.packRequest()
+}
+
+type AWDigitalExtenderQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return AWDigitalExtenderQuery{} }) }
+func (a AWDigitalExtenderQuery) Acceptable() bool {
+	return true
+}
+func (a AWDigitalExtenderQuery) Response() AWResponse {
+	return AWDigitalExtender{}
+}
+func (a AWDigitalExtenderQuery) requestSignature() string {
+	return "QDE"
+}
+func (a AWDigitalExtenderQuery) unpackRequest(_ string) AWRequest {
+	return a
+}
+func (a AWDigitalExtenderQuery) packRequest() string {
+	return "QDE"
 }
