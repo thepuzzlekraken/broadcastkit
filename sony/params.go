@@ -1147,3 +1147,31 @@ func (ExposureNDVariableParam) _imagingParameter() {}
 func init() {
 	registerParameter(func() Parameter { return ExposureNDVariableParam{} })
 }
+
+type ExposureAutoIrisParam struct {
+	Auto Switch
+}
+
+func (ExposureAutoIrisParam) parameterKey() string {
+	return "ExposureAutoIris"
+}
+
+func (p ExposureAutoIrisParam) parameterValue() string {
+	return string(p.Auto)
+}
+
+func (ExposureAutoIrisParam) parameterParse(s string) (Parameter, error) {
+	return ExposureAutoIrisParam{
+		Auto: Switch(s),
+	}, nil
+}
+
+func (p ExposureAutoIrisParam) Valid() bool {
+	return p.Auto.Valid()
+}
+
+func (ExposureAutoIrisParam) _imagingParameter() {}
+
+func init() {
+	registerParameter(func() Parameter { return ExposureAutoIrisParam{} })
+}
