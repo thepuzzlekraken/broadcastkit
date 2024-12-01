@@ -136,7 +136,7 @@ func (c *CameraClient) AWCommand(req AWRequest) (AWResponse, error) {
 
 	res := req.Response()
 	if sig := res.responseSignature(); match(sig, ret) {
-		res.unpackResponse(ret)
+		res = res.unpackResponse(ret)
 	} else {
 		res = newResponse(ret, guessQuirks(cmd))
 	}
