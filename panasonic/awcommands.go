@@ -1064,13 +1064,13 @@ func (a AWIris) packResponse() string {
 
 // AWAutoIris configures the camera automatic iris control
 type AWAutoIris struct {
-	AutoIris Toggle
+	Enabled Toggle
 }
 
 func init() { registerRequest(func() AWRequest { return AWAutoIris{} }) }
 func init() { registerResponse(func() AWResponse { return AWAutoIris{} }) }
 func (a AWAutoIris) Acceptable() bool {
-	return a.AutoIris.Acceptable()
+	return a.Enabled.Acceptable()
 }
 func (a AWAutoIris) Response() AWResponse {
 	return a
@@ -1080,21 +1080,21 @@ func (a AWAutoIris) requestSignature() string {
 	return "#D3\x02"
 }
 func (a AWAutoIris) unpackRequest(cmd string) AWRequest {
-	a.AutoIris = toToggle(cmd[3:4])
+	a.Enabled = toToggle(cmd[3:4])
 	return a
 }
 func (a AWAutoIris) packRequest() string {
-	return "#D3" + a.AutoIris.toWire()
+	return "#D3" + a.Enabled.toWire()
 }
 func (a AWAutoIris) responseSignature() string {
 	return "d3\x02"
 }
 func (a AWAutoIris) unpackResponse(cmd string) AWResponse {
-	a.AutoIris = toToggle(cmd[2:3])
+	a.Enabled = toToggle(cmd[2:3])
 	return a
 }
 func (a AWAutoIris) packResponse() string {
-	return "d3" + a.AutoIris.toWire()
+	return "d3" + a.Enabled.toWire()
 }
 
 // AWAutoIrisQuery requests the current automatic iris control configuration.
@@ -4265,13 +4265,13 @@ func (o OisToggle) Acceptable() bool {
 }
 
 type AWImageStabilization struct {
-	On OisToggle
+	Mode OisToggle
 }
 
 func init() { registerRequest(func() AWRequest { return AWImageStabilization{} }) }
 func init() { registerResponse(func() AWResponse { return AWImageStabilization{} }) }
 func (a AWImageStabilization) Acceptable() bool {
-	return a.On.Acceptable()
+	return a.Mode.Acceptable()
 }
 func (a AWImageStabilization) Response() AWResponse {
 	return a
@@ -4280,11 +4280,11 @@ func (a AWImageStabilization) requestSignature() string {
 	return "OIS:\x02"
 }
 func (a AWImageStabilization) unpackRequest(cmd string) AWRequest {
-	a.On = OisToggle(dec2int(cmd[4:5]))
+	a.Mode = OisToggle(dec2int(cmd[4:5]))
 	return a
 }
 func (a AWImageStabilization) packRequest() string {
-	return "OIS:" + int2dec(int(a.On), 1)
+	return "OIS:" + int2dec(int(a.Mode), 1)
 }
 func (a AWImageStabilization) responseSignature() string {
 	return a.requestSignature()
@@ -4316,13 +4316,13 @@ func (a AWImageStabilizationQuery) packRequest() string {
 }
 
 type AWDigitalZoom struct {
-	On Toggle
+	Enabled Toggle
 }
 
 func init() { registerRequest(func() AWRequest { return AWDigitalZoom{} }) }
 func init() { registerResponse(func() AWResponse { return AWDigitalZoom{} }) }
 func (a AWDigitalZoom) Acceptable() bool {
-	return a.On.Acceptable()
+	return a.Enabled.Acceptable()
 }
 func (a AWDigitalZoom) Response() AWResponse {
 	return a
@@ -4331,11 +4331,11 @@ func (a AWDigitalZoom) requestSignature() string {
 	return "OSE:70:\x02"
 }
 func (a AWDigitalZoom) unpackRequest(cmd string) AWRequest {
-	a.On = Toggle(dec2int(cmd[7:8]))
+	a.Enabled = Toggle(dec2int(cmd[7:8]))
 	return a
 }
 func (a AWDigitalZoom) packRequest() string {
-	return "OSE:70:" + int2dec(int(a.On), 1)
+	return "OSE:70:" + int2dec(int(a.Enabled), 1)
 }
 func (a AWDigitalZoom) responseSignature() string {
 	return a.requestSignature()
@@ -4367,13 +4367,13 @@ func (a AWDigitalZoomQuery) packRequest() string {
 }
 
 type AWiZoom struct {
-	On Toggle
+	Enabled Toggle
 }
 
 func init() { registerRequest(func() AWRequest { return AWiZoom{} }) }
 func init() { registerResponse(func() AWResponse { return AWiZoom{} }) }
 func (a AWiZoom) Acceptable() bool {
-	return a.On.Acceptable()
+	return a.Enabled.Acceptable()
 }
 func (a AWiZoom) Response() AWResponse {
 	return a
@@ -4382,11 +4382,11 @@ func (a AWiZoom) requestSignature() string {
 	return "OSD:B3:\x02"
 }
 func (a AWiZoom) unpackRequest(cmd string) AWRequest {
-	a.On = Toggle(dec2int(cmd[7:8]))
+	a.Enabled = Toggle(dec2int(cmd[7:8]))
 	return a
 }
 func (a AWiZoom) packRequest() string {
-	return "OSD:B3:" + int2dec(int(a.On), 1)
+	return "OSD:B3:" + int2dec(int(a.Enabled), 1)
 }
 func (a AWiZoom) responseSignature() string {
 	return a.requestSignature()
@@ -4418,13 +4418,13 @@ func (a AWiZoomQuery) packRequest() string {
 }
 
 type AWDigitalExtender struct {
-	On Toggle
+	Enabled Toggle
 }
 
 func init() { registerRequest(func() AWRequest { return AWDigitalExtender{} }) }
 func init() { registerResponse(func() AWResponse { return AWDigitalExtender{} }) }
 func (a AWDigitalExtender) Acceptable() bool {
-	return a.On.Acceptable()
+	return a.Enabled.Acceptable()
 }
 func (a AWDigitalExtender) Response() AWResponse {
 	return a
@@ -4433,11 +4433,11 @@ func (a AWDigitalExtender) requestSignature() string {
 	return "ODE:\x02"
 }
 func (a AWDigitalExtender) unpackRequest(cmd string) AWRequest {
-	a.On = Toggle(dec2int(cmd[4:5]))
+	a.Enabled = Toggle(dec2int(cmd[4:5]))
 	return a
 }
 func (a AWDigitalExtender) packRequest() string {
-	return "ODE:" + int2dec(int(a.On), 1)
+	return "ODE:" + int2dec(int(a.Enabled), 1)
 }
 func (a AWDigitalExtender) responseSignature() string {
 	return a.requestSignature()
