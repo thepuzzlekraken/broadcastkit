@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-const networkTimeout = 3 * time.Second
+const networkTimeout = 5 * time.Second
 
 // CameraClient represent a remote camera to be controlled via the AW protocol
 type CameraClient struct {
