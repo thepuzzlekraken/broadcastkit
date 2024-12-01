@@ -1052,3 +1052,98 @@ func (CameraNameParam) _networkParameter() {}
 func init() {
 	registerParameter(func() Parameter { return CameraNameParam{} })
 }
+
+//
+// Parameters for ImagingEndpoint
+//
+
+type NDState string
+
+const (
+	NDClear    NDState = "clear"
+	NDFiltered NDState = "filtered"
+)
+
+func (n NDState) Valid() bool {
+	return n == NDClear || n == NDFiltered
+}
+
+type ExposureNDClearParam struct {
+	FilterState NDState
+}
+
+func (ExposureNDClearParam) parameterKey() string {
+	return "ExposureNDClear"
+}
+func (p ExposureNDClearParam) parameterValue() string {
+	return string(p.FilterState)
+}
+func (ExposureNDClearParam) parameterParse(s string) (Parameter, error) {
+	return ExposureNDClearParam{
+		FilterState: NDState(s),
+	}, nil
+}
+func (p ExposureNDClearParam) Valid() bool {
+	return p.FilterState.Valid()
+}
+func (ExposureNDClearParam) _imagingParameter() {}
+func init() {
+	registerParameter(func() Parameter { return ExposureNDClearParam{} })
+}
+
+type NDLevel int
+
+const (
+	ND1o4 NDLevel = iota
+	ND1o5
+	ND1o6
+	ND1o7
+	ND1o8
+	ND1o10
+	ND1o11
+	ND1o13
+	ND1o16
+	ND1o19
+	ND1o23
+	ND1o27
+	ND1o32
+	ND1o38
+	ND1o45
+	ND1o54
+	ND1o64
+	ND1o76
+	ND1o91
+	ND1o108
+	ND1o128
+)
+
+func (n NDLevel) Valid() bool {
+	return (n >= ND1o4) && (n <= ND1o128)
+}
+
+type ExposureNDVariableParam struct {
+	Level NDLevel
+}
+
+func (ExposureNDVariableParam) parameterKey() string {
+	return "ExposureNDVariable"
+}
+func (p ExposureNDVariableParam) parameterValue() string {
+	return itoa(int(p.Level))
+}
+func (ExposureNDVariableParam) parameterParse(s string) (Parameter, error) {
+	i, err := atoi(s)
+	if err != nil {
+		return nil, err
+	}
+	return ExposureNDVariableParam{
+		Level: NDLevel(i),
+	}, nil
+}
+func (p ExposureNDVariableParam) Valid() bool {
+	return p.Level.Valid()
+}
+func (ExposureNDVariableParam) _imagingParameter() {}
+func init() {
+	registerParameter(func() Parameter { return ExposureNDVariableParam{} })
+}

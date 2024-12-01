@@ -329,6 +329,21 @@ func (c *CameraClient) InqNetwork() ([]NetworkParameter, error) {
 	return castSpecific[NetworkParameter](gs), err
 }
 
+const ImagingEndpoint Endpoint = "imaging"
+
+type ImagingParameter interface {
+	Parameter
+	_imagingParameter()
+}
+
+func (c *CameraClient) SetImaging(p ...ImagingParameter) error {
+	return c.Set(ImagingEndpoint, castGeneric(p))
+}
+func (c *CameraClient) InqImaging() ([]ImagingParameter, error) {
+	gs, err := c.Inq(ImagingEndpoint)
+	return castSpecific[ImagingParameter](gs), err
+}
+
 func (c *CameraClient) ScreenshotOfPreset(p Preset) ([]byte, error) {
 	c.httpOnce.Do(c.httpInit)
 
