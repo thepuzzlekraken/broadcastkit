@@ -1175,3 +1175,76 @@ func (ExposureAutoIrisParam) _imagingParameter() {}
 func init() {
 	registerParameter(func() Parameter { return ExposureAutoIrisParam{} })
 }
+
+type ExposureIrisRangeParam struct {
+	Min, Max int
+}
+
+func (ExposureIrisRangeParam) parameterKey() string {
+	return "ExposureIrisRange"
+}
+
+func (p ExposureIrisRangeParam) parameterValue() string {
+	return itoa(p.Min) + ":" + itoa(p.Max)
+}
+
+func (ExposureIrisRangeParam) parameterParse(s string) (Parameter, error) {
+	parts := commaSplit(s)
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid comma-joined-list length: %d, expects 2", len(parts))
+	}
+	min, err := atoi(parts[0])
+	if err != nil {
+		return nil, err
+	}
+	max, err := atoi(parts[1])
+	if err != nil {
+		return nil, err
+	}
+	return ExposureIrisRangeParam{
+		Min: min,
+		Max: max,
+	}, nil
+}
+
+func (p ExposureIrisRangeParam) Valid() bool {
+	return p.Min <= p.Max
+}
+
+func (ExposureIrisRangeParam) _imagingParameter() {}
+
+func init() {
+	registerParameter(func() Parameter { return ExposureIrisRangeParam{} })
+}
+
+type ExposureIrisParam struct {
+	Iris int
+}
+
+func (ExposureIrisParam) parameterKey() string {
+	return "ExposureIris"
+}
+
+func (p ExposureIrisParam) parameterValue() string {
+	return itoa(p.Iris)
+}
+
+func (ExposureIrisParam) parameterParse(s string) (Parameter, error) {
+	iris, err := atoi(s)
+	if err != nil {
+		return nil, err
+	}
+	return ExposureIrisParam{
+		Iris: iris,
+	}, nil
+}
+
+func (p ExposureIrisParam) Valid() bool {
+	return p.Iris >= 0 && p.Iris <= 65535
+}
+
+func (ExposureIrisParam) _imagingParameter() {}
+
+func init() {
+	registerParameter(func() Parameter { return ExposureIrisParam{} })
+}
