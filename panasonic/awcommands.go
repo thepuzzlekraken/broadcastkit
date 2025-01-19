@@ -4467,3 +4467,75 @@ func (a AWDigitalExtenderQuery) unpackRequest(_ string) AWRequest {
 func (a AWDigitalExtenderQuery) packRequest() string {
 	return "QDE"
 }
+
+type PinPPos int
+
+const (
+	// values offset by one, to make go zero-value invalid
+	PinPUpperRight = 1
+	PinPLowerRight = 2
+	PinPLowerLeft  = 3
+	PinPUpperLeft  = 4
+)
+
+func (p PinPPos) Acceptable() bool {
+	return p >= PinPUpperRight && p <= PinPUpperLeft
+}
+func (p PinPPos) toWire() string {
+	return int2dec(int(p)-1, 1)
+}
+func toPinPPos(s string) PinPPos {
+	return PinPPos(dec2int(s) + 1)
+}
+
+type AWPinPDisplayPos struct {
+	pos PinPPos
+}
+
+func init() { registerRequest(func() AWRequest { return AWPinPDisplayPos{} }) }
+func init() { registerResponse(func() AWResponse { return AWPinPDisplayPos{} }) }
+func (a AWPinPDisplayPos) Acceptable() bool {
+	return a.pos.Acceptable()
+}
+func (a AWPinPDisplayPos) Response() AWResponse {
+	return a
+}
+func (a AWPinPDisplayPos) requestSignature() string {
+	return "#PD\x02"
+}
+func (a AWPinPDisplayPos) unpackRequest(s string) AWRequest {
+	a.pos = toPinPPos(s[3:4])
+	return a
+}
+func (a AWPinPDisplayPos) packRequest() string {
+	return "#PD" + a.pos.toWire()
+}
+func (a AWPinPDisplayPos) responseSignature() string {
+	return "pD\x02"
+}
+func (a AWPinPDisplayPos) unpackResponse(cmd string) AWResponse {
+	a.pos = toPinPPos(cmd[2:3])
+	return a
+}
+func (a AWPinPDisplayPos) packResponse() string {
+	return "pD" + a.pos.toWire()
+}
+
+type AWPinPDisplayPosQuery struct{}
+
+func init() { registerRequest(func() AWRequest { return AWPinPDisplayPosQuery{} }) }
+func (a AWPinPDisplayPosQuery) Acceptable() bool {
+	return true
+}
+func (a AWPinPDisplayPosQuery) Response() AWResponse {
+	return AWPinPDisplayPos{}
+}
+func (a AWPinPDisplayPosQuery) requestSignature() string {
+	return "#PD"
+}
+func (a AWPinPDisplayPosQuery) unpackRequest(_ string) AWRequest {
+	return a
+}
+func (a AWPinPDisplayPosQuery) packRequest() string {
+	return "#PD"
+}
