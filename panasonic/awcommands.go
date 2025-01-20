@@ -3069,26 +3069,30 @@ func (a AWSDIFormatQuery) packRequest() string {
 	return "QSD:B9"
 }
 
-// Decibel is a logaritmic value from 0 to 121 in dB scale.
+// Decibel is a logaritmic value from 0 to 48 in dB scale.
 //
-// The maximum value is camera-dependent, -1 is understood as "none/auto"
+// The magic value -9 is understood as "none/auto"
 type Decibel int
 
+const DecibelAuto Decibel = -9
+
 func (d Decibel) toWire() string {
-	if d == -1 {
+	if d == DecibelAuto {
 		d = 0x80
+	} else {
+		d += 8
 	}
 	return int2hex(int(d), 2)
 }
 func toDecibel(s string) Decibel {
 	d := Decibel(hex2int(s[0:2]))
 	if d == 0x80 {
-		d = -1
+		return DecibelAuto
 	}
-	return d
+	return d - 8
 }
 func (d Decibel) Acceptable() bool {
-	return d >= -1 && d <= 121
+	return (d >= 0 && d <= 48) || d == DecibelAuto
 }
 
 // AWGain sets the sensor gain level
