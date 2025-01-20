@@ -1436,3 +1436,214 @@ func (p ExposureAGCEnableParam) _imagingParameter() {}
 func init() {
 	registerParameter(func() Parameter { return ExposureAGCEnableParam{} })
 }
+
+type ShutterMode string
+
+const (
+	ShutterSpeed ShutterMode = "speed"
+	ShutterAngle ShutterMode = "angle"
+)
+
+type ExposureShutterModeParam struct {
+	Mode ShutterMode
+}
+
+func (p ExposureShutterModeParam) parameterKey() string {
+	return "ExposureShutterMode"
+}
+
+func (p ExposureShutterModeParam) parameterValue() string {
+	return string(p.Mode)
+}
+
+func (ExposureShutterModeParam) parameterParse(s string) (Parameter, error) {
+	return ExposureShutterModeParam{
+		Mode: ShutterMode(s),
+	}, nil
+}
+
+func (p ExposureShutterModeParam) Valid() bool {
+	return p.Mode == ShutterSpeed || p.Mode == ShutterAngle
+}
+
+func (p ExposureShutterModeParam) _imagingParameter() {}
+
+func init() {
+	registerParameter(func() Parameter { return ExposureShutterModeParam{} })
+}
+
+type ExposureShutterSpeedEnableParam struct {
+	Enable Switch
+}
+
+func (p ExposureShutterSpeedEnableParam) parameterKey() string {
+	return "ExposureShutterSpeedEnable"
+}
+
+func (p ExposureShutterSpeedEnableParam) parameterValue() string {
+	return string(p.Enable)
+}
+
+func (ExposureShutterSpeedEnableParam) parameterParse(s string) (Parameter, error) {
+	return ExposureShutterSpeedEnableParam{
+		Enable: Switch(s),
+	}, nil
+}
+
+func (p ExposureShutterSpeedEnableParam) Valid() bool {
+	return p.Enable.Valid()
+}
+
+func (p ExposureShutterSpeedEnableParam) _imagingParameter() {}
+
+func init() {
+	registerParameter(func() Parameter { return ExposureShutterSpeedEnableParam{} })
+}
+
+type ExposureTime int
+
+// expoMap translates from API values to timings
+// This map is off by one! Zero index is value 1 on the API.
+var expoMap = map[Frequency][25]int{
+	Freq_59_94_Hz: {0, 0, 0, 0, -64, -32, -16, -8, -7, -6, -5, -4, -3, -2, 50, 60, 100, 120, 125, 250, 500, 1000, 2000, 4000, 8000},
+	Freq_50_00_Hz: {0, 0, 0, 0, -64, -32, -16, -8, -7, -6, -5, -4, -3, -2, 50, 60, 100, 120, 125, 250, 500, 1000, 2000, 4000, 8000},
+	Freq_29_97_Hz: {0, 0, -64, -32, -16, -8, -7, -6, -5, -4, -3, -2, 30, 40, 50, 60, 100, 120, 125, 250, 500, 1000, 2000, 4000, 8000},
+	Freq_25_00_Hz: {0, 0, -64, -32, -16, -8, -7, -6, -5, -4, -3, -2, 25, 33, 50, 60, 100, 120, 125, 250, 500, 1000, 2000, 4000, 8000},
+	Freq_24_00_Hz: {-64, -32, -16, -8, -7, -6, -5, -4, -3, -2, 24, 32, 48, 50, 60, 96, 100, 120, 125, 250, 500, 1000, 2000, 4000, 8000},
+	Freq_23_98_Hz: {-64, -32, -16, -8, -7, -6, -5, -4, -3, -2, 24, 32, 48, 50, 60, 96, 100, 120, 125, 250, 500, 1000, 2000, 4000, 8000},
+}
+
+func SpeedToExposureTime(over int, freq Frequency) ExposureTime {
+	m, ok := expoMap[freq]
+	if !ok {
+		// frequency is invalid
+		return 0
+	}
+
+	if over == 0 {
+		// invalid "over" division
+		return 0
+	}
+
+	i := 0
+	for i < len(m) {
+		if m[i] == 0 {
+			i++
+			continue
+		}
+		if over == m[i] {
+			// exact match, return
+			return ExposureTime(i) + 1
+		}
+		if over < m[i] {
+			// not exact match, break for rounding to nearest
+			break
+		}
+		i++
+	}
+	if i == 0 || m[i-1] == 0 {
+		// longer than the longest exposure, round to longest
+		return ExposureTime(i) + 1
+	}
+	// round to closest value
+	if (m[i] - over) < (over - m[i-1]) {
+		return ExposureTime(i) + 1
+	}
+	return ExposureTime(i-1) + 1
+}
+
+func ExposureTimeToSpeed(expo ExposureTime, freq Frequency) int {
+	m, ok := expoMap[freq]
+	if !ok {
+		// frequency is invalid
+		return 0
+	}
+	if expo < 1 || int(expo) > len(m) {
+		// expo is invalid
+		return 0
+	}
+	return m[expo-1]
+}
+
+type ExposureExposureTimeParam struct {
+	Time ExposureTime
+}
+
+func (p ExposureExposureTimeParam) parameterKey() string {
+	return "ExposureExposureTime"
+}
+
+func (p ExposureExposureTimeParam) parameterValue() string {
+	return itoa(int(p.Time))
+}
+
+func (ExposureExposureTimeParam) parameterParse(s string) (Parameter, error) {
+	i, err := atoi(s)
+	if err != nil {
+		return nil, err
+	}
+	return ExposureExposureTimeParam{
+		Time: ExposureTime(i),
+	}, nil
+}
+
+func (p ExposureExposureTimeParam) Valid() bool {
+	return p.Time > 0
+}
+
+func (p ExposureExposureTimeParam) _imagingParameter() {}
+
+func init() {
+	registerParameter(func() Parameter { return ExposureExposureTimeParam{} })
+}
+
+//
+// Parameters for project endpoint
+//
+
+type Frequency int
+
+const (
+	Freq_59_94_Hz Frequency = 5994
+	Freq_50_00_Hz Frequency = 5000
+	Freq_29_97_Hz Frequency = 2997
+	Freq_25_00_Hz Frequency = 2500
+	Freq_24_00_Hz Frequency = 2400
+	Freq_23_98_Hz Frequency = 2398
+)
+
+func (p Frequency) Valid() bool {
+	return p == Freq_59_94_Hz || p == Freq_50_00_Hz || p == Freq_29_97_Hz || p == Freq_25_00_Hz || p == Freq_24_00_Hz || p == Freq_23_98_Hz
+}
+
+type RecFormatFrequencyParam struct {
+	Frequency Frequency
+}
+
+func (p RecFormatFrequencyParam) parameterKey() string {
+	return "RecFormatFrequency"
+}
+
+func (p RecFormatFrequencyParam) parameterValue() string {
+	return itoa(int(p.Frequency))
+}
+
+func (RecFormatFrequencyParam) parameterParse(s string) (Parameter, error) {
+	i, err := atoi(s)
+	if err != nil {
+		return nil, err
+	}
+	return RecFormatFrequencyParam{
+		Frequency: Frequency(i),
+	}, nil
+}
+
+func (p RecFormatFrequencyParam) Valid() bool {
+	return p.Frequency.Valid()
+}
+
+func (p RecFormatFrequencyParam) _projectParameter() {}
+
+func init() {
+	registerParameter(func() Parameter { return RecFormatFrequencyParam{} })
+}

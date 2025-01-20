@@ -344,6 +344,22 @@ func (c *CameraClient) InqImaging() ([]ImagingParameter, error) {
 	return castSpecific[ImagingParameter](gs), err
 }
 
+const ProjectEndpoint Endpoint = "project"
+
+type ProjectParameter interface {
+	Parameter
+	_projectParameter()
+}
+
+func (c *CameraClient) SetProject(p ...ProjectParameter) error {
+	return c.Set(ProjectEndpoint, castGeneric(p))
+}
+
+func (c *CameraClient) InqProject() ([]ProjectParameter, error) {
+	gs, err := c.Inq(ProjectEndpoint)
+	return castSpecific[ProjectParameter](gs), err
+}
+
 func (c *CameraClient) ScreenshotOfPreset(p Preset) ([]byte, error) {
 	c.httpOnce.Do(c.httpInit)
 
