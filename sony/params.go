@@ -1313,66 +1313,66 @@ func init() {
 	registerParameter(func() Parameter { return WhiteBalanceTintParam{} })
 }
 
-type WhiteBalanceCbGain struct {
+type WhiteBalanceCbGainParam struct {
 	Gain int
 }
 
-func (p WhiteBalanceCbGain) parameterKey() string {
+func (p WhiteBalanceCbGainParam) parameterKey() string {
 	return "WhiteBalanceCbGain"
 }
 
-func (p WhiteBalanceCbGain) parameterValue() string {
+func (p WhiteBalanceCbGainParam) parameterValue() string {
 	return itoa(p.Gain)
 }
 
-func (WhiteBalanceCbGain) parameterParse(s string) (Parameter, error) {
+func (WhiteBalanceCbGainParam) parameterParse(s string) (Parameter, error) {
 	gain, err := atoi(s)
 	if err != nil {
 		return nil, err
 	}
-	return WhiteBalanceCbGain{
+	return WhiteBalanceCbGainParam{
 		Gain: gain,
 	}, nil
 }
 
-func (p WhiteBalanceCbGain) Valid() bool {
+func (p WhiteBalanceCbGainParam) Valid() bool {
 	return p.Gain >= -990 && p.Gain <= 990
 }
 
-func (p WhiteBalanceCbGain) _imagingParameter() {}
+func (p WhiteBalanceCbGainParam) _imagingParameter() {}
 
 func init() {
-	registerParameter(func() Parameter { return WhiteBalanceCbGain{} })
+	registerParameter(func() Parameter { return WhiteBalanceCbGainParam{} })
 }
 
-type WhiteBalanceCrGain struct {
+type WhiteBalanceCrGainParam struct {
 	Gain int
 }
 
-func (p WhiteBalanceCrGain) parameterKey() string {
+func (p WhiteBalanceCrGainParam) parameterKey() string {
 	return "WhiteBalanceCrGain"
 }
 
-func (p WhiteBalanceCrGain) parameterValue() string {
+func (p WhiteBalanceCrGainParam) parameterValue() string {
 	return itoa(p.Gain)
 }
 
-func (WhiteBalanceCrGain) parameterParse(s string) (Parameter, error) {
+func (WhiteBalanceCrGainParam) parameterParse(s string) (Parameter, error) {
 	gain, err := atoi(s)
 	if err != nil {
 		return nil, err
 	}
-	return WhiteBalanceCrGain{
+	return WhiteBalanceCrGainParam{
 		Gain: gain,
 	}, nil
 }
 
-func (p WhiteBalanceCrGain) Valid() bool {
+func (p WhiteBalanceCrGainParam) Valid() bool {
 	return p.Gain >= -990 && p.Gain <= 990
 }
 
-func (p WhiteBalanceCrGain) _imagingParameter() {}
+func (p WhiteBalanceCrGainParam) _imagingParameter() {}
 
 func init() {
-	registerParameter(func() Parameter { return WhiteBalanceCrGain{} })
+	registerParameter(func() Parameter { return WhiteBalanceCrGainParam{} })
 }
