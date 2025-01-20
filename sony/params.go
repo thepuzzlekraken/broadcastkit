@@ -1248,3 +1248,35 @@ func (ExposureIrisParam) _imagingParameter() {}
 func init() {
 	registerParameter(func() Parameter { return ExposureIrisParam{} })
 }
+
+type WhiteBalanceColorTempParam struct {
+	Kelvin int
+}
+
+func (p WhiteBalanceColorTempParam) parameterKey() string {
+	return "WhiteBalanceColorTemp"
+}
+
+func (p WhiteBalanceColorTempParam) parameterValue() string {
+	return itoa(p.Kelvin)
+}
+
+func (WhiteBalanceColorTempParam) parameterParse(s string) (Parameter, error) {
+	kelvin, err := atoi(s)
+	if err != nil {
+		return nil, err
+	}
+	return WhiteBalanceColorTempParam{
+		Kelvin: kelvin,
+	}, nil
+}
+
+func (p WhiteBalanceColorTempParam) Valid() bool {
+	return p.Kelvin >= 2000 && p.Kelvin <= 15000
+}
+
+func (WhiteBalanceColorTempParam) _imagingParameter() {}
+
+func init() {
+	registerParameter(func() Parameter { return WhiteBalanceColorTempParam{} })
+}

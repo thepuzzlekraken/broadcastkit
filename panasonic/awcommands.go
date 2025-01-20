@@ -4175,10 +4175,10 @@ func (a AWBGainQuery) packRequest() string {
 type ColorTemp int
 
 func (c ColorTemp) K() int {
-	return int(c)*100 + 2000
+	return int(c)*100 + 2400
 }
 func ToColorTemp(k int) ColorTemp {
-	c := ColorTemp((k - 2000) / 100)
+	c := ColorTemp((k - 2400) / 100)
 	if k%100 >= 50 {
 		c += 1 // mathematical rounding
 	}
