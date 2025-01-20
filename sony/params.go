@@ -1376,3 +1376,63 @@ func (p WhiteBalanceCrGainParam) _imagingParameter() {}
 func init() {
 	registerParameter(func() Parameter { return WhiteBalanceCrGainParam{} })
 }
+
+type ExposureGainParam struct {
+	Gain int
+}
+
+func (p ExposureGainParam) parameterKey() string {
+	return "ExposureGain"
+}
+
+func (p ExposureGainParam) parameterValue() string {
+	return itoa(p.Gain)
+}
+
+func (ExposureGainParam) parameterParse(s string) (Parameter, error) {
+	gain, err := atoi(s)
+	if err != nil {
+		return nil, err
+	}
+	return ExposureGainParam{
+		Gain: gain,
+	}, nil
+}
+
+func (p ExposureGainParam) Valid() bool {
+	return p.Gain >= 6 && p.Gain <= 39
+}
+
+func (p ExposureGainParam) _imagingParameter() {}
+
+func init() {
+	registerParameter(func() Parameter { return ExposureGainParam{} })
+}
+
+type ExposureAGCEnableParam struct {
+	Enable Switch
+}
+
+func (p ExposureAGCEnableParam) parameterKey() string {
+	return "ExposureAGCEnable"
+}
+
+func (p ExposureAGCEnableParam) parameterValue() string {
+	return string(p.Enable)
+}
+
+func (ExposureAGCEnableParam) parameterParse(s string) (Parameter, error) {
+	return ExposureAGCEnableParam{
+		Enable: Switch(s),
+	}, nil
+}
+
+func (p ExposureAGCEnableParam) Valid() bool {
+	return p.Enable.Valid()
+}
+
+func (p ExposureAGCEnableParam) _imagingParameter() {}
+
+func init() {
+	registerParameter(func() Parameter { return ExposureAGCEnableParam{} })
+}
