@@ -3743,6 +3743,103 @@ func (a AWOSDQuery) packResponse() string {
 	return "OUS:" + a.Enable.toWire()
 }
 
+type AWOSDUp struct {
+	I int
+}
+
+func init() { registerRequest(func() AWRequest { return AWOSDUp{} }) }
+func init() { registerResponse(func() AWResponse { return AWOSDUp{} }) }
+
+func (a AWOSDUp) Acceptable() bool {
+	return a.I == 1
+}
+func (a AWOSDUp) Response() AWResponse {
+	return a
+}
+func (a AWOSDUp) requestSignature() string {
+	return "DUP:\x01"
+}
+func (a AWOSDUp) unpackRequest(s string) AWRequest {
+	a.I = hex2int(s[4:5])
+	return a
+}
+func (a AWOSDUp) packRequest() string {
+	return "DUP:" + int2hex(a.I, 1)
+}
+func (a AWOSDUp) responseSignature() string {
+	return a.requestSignature()
+}
+func (a AWOSDUp) unpackResponse(s string) AWResponse {
+	return a.unpackRequest(s).(AWResponse)
+}
+func (a AWOSDUp) packResponse() string {
+	return a.packRequest()
+}
+
+type AWOSDDown struct {
+	I int
+}
+
+func init() { registerRequest(func() AWRequest { return AWOSDDown{} }) }
+func init() { registerResponse(func() AWResponse { return AWOSDDown{} }) }
+func (a AWOSDDown) Acceptable() bool {
+	return a.I == 1
+}
+func (a AWOSDDown) Response() AWResponse {
+	return a
+}
+func (a AWOSDDown) requestSignature() string {
+	return "DDW:\x01"
+}
+func (a AWOSDDown) unpackRequest(s string) AWRequest {
+	a.I = hex2int(s[4:5])
+	return a
+}
+func (a AWOSDDown) packRequest() string {
+	return "DDW:" + int2hex(a.I, 1)
+}
+func (a AWOSDDown) responseSignature() string {
+	return a.requestSignature()
+}
+func (a AWOSDDown) unpackResponse(s string) AWResponse {
+	return a.unpackRequest(s).(AWResponse)
+}
+func (a AWOSDDown) packResponse() string {
+	return a.packRequest()
+}
+
+type AWOSDOk struct {
+	I int
+}
+
+func init() { registerRequest(func() AWRequest { return AWOSDOk{} }) }
+func init() { registerResponse(func() AWResponse { return AWOSDOk{} }) }
+func (a AWOSDOk) Acceptable() bool {
+	return a.I == 1
+}
+func (a AWOSDOk) Response() AWResponse {
+	return a
+}
+func (a AWOSDOk) requestSignature() string {
+	return "DIT:\x01"
+}
+func (a AWOSDOk) unpackRequest(s string) AWRequest {
+	a.I = hex2int(s[4:5])
+	return a
+}
+func (a AWOSDOk) packRequest() string {
+	return "DIT:" + int2hex(a.I, 1)
+}
+func (a AWOSDOk) responseSignature() string {
+	return a.requestSignature()
+}
+func (a AWOSDOk) unpackResponse(s string) AWResponse {
+	return a.unpackRequest(s).(AWResponse)
+}
+func (a AWOSDOk) packResponse() string {
+	return a.packRequest()
+}
+
 // AWTotalDetail is a camera-dependent detail configuration
 type AWTotalDetail struct {
 	Detail int

@@ -83,6 +83,7 @@ const (
 	DownLeftDirection  Direction = "down-left"
 	DownRightDirection Direction = "down-right"
 	StopDirection      Direction = "stop"
+	SetDirection       Direction = "set" // used by Menu
 )
 
 func (d Direction) Valid() bool {
@@ -158,20 +159,20 @@ func (s Switch) Valid() bool {
 //
 
 type AssignableButton1Param struct {
-	state Button
+	State Button
 }
 
 func (AssignableButton1Param) parameterKey() string {
 	return "AssignableButton1"
 }
 func (a AssignableButton1Param) parameterValue() string {
-	return string(a.state)
+	return string(a.State)
 }
 func (AssignableButton1Param) parameterParse(s string) (Parameter, error) {
 	return AssignableButton1Param{Button(s)}, nil
 }
 func (a AssignableButton1Param) Valid() bool {
-	return a.state.Valid()
+	return a.State.Valid()
 }
 func (AssignableButton1Param) _assignableParameter() {}
 
@@ -180,20 +181,20 @@ func init() {
 }
 
 type AssignableButton2Param struct {
-	state Button
+	State Button
 }
 
 func (AssignableButton2Param) parameterKey() string {
 	return "AssignableButton2"
 }
 func (a AssignableButton2Param) parameterValue() string {
-	return string(a.state)
+	return string(a.State)
 }
 func (AssignableButton2Param) parameterParse(s string) (Parameter, error) {
 	return AssignableButton2Param{Button(s)}, nil
 }
 func (a AssignableButton2Param) Valid() bool {
-	return a.state.Valid()
+	return a.State.Valid()
 }
 func (AssignableButton2Param) _assignableParameter() {}
 
@@ -202,20 +203,20 @@ func init() {
 }
 
 type AssignableButton3Param struct {
-	state Button
+	State Button
 }
 
 func (AssignableButton3Param) parameterKey() string {
 	return "AssignableButton3"
 }
 func (a AssignableButton3Param) parameterValue() string {
-	return string(a.state)
+	return string(a.State)
 }
 func (AssignableButton3Param) parameterParse(s string) (Parameter, error) {
 	return AssignableButton3Param{Button(s)}, nil
 }
 func (a AssignableButton3Param) Valid() bool {
-	return a.state.Valid()
+	return a.State.Valid()
 }
 func (AssignableButton3Param) _assignableParameter() {}
 
@@ -224,20 +225,20 @@ func init() {
 }
 
 type AssignableButton4Param struct {
-	state Button
+	State Button
 }
 
 func (AssignableButton4Param) parameterKey() string {
 	return "AssignableButton4"
 }
 func (a AssignableButton4Param) parameterValue() string {
-	return string(a.state)
+	return string(a.State)
 }
 func (AssignableButton4Param) parameterParse(s string) (Parameter, error) {
 	return AssignableButton4Param{Button(s)}, nil
 }
 func (a AssignableButton4Param) Valid() bool {
-	return a.state.Valid()
+	return a.State.Valid()
 }
 func (AssignableButton4Param) _assignableParameter() {}
 
@@ -246,20 +247,20 @@ func init() {
 }
 
 type AssignableButton5Param struct {
-	state Button
+	State Button
 }
 
 func (AssignableButton5Param) parameterKey() string {
 	return "AssignableButton5"
 }
 func (a AssignableButton5Param) parameterValue() string {
-	return string(a.state)
+	return string(a.State)
 }
 func (AssignableButton5Param) parameterParse(s string) (Parameter, error) {
 	return AssignableButton5Param{Button(s)}, nil
 }
 func (a AssignableButton5Param) Valid() bool {
-	return a.state.Valid()
+	return a.State.Valid()
 }
 func (AssignableButton5Param) _assignableParameter() {}
 
@@ -268,20 +269,20 @@ func init() {
 }
 
 type AssignableButton6Param struct {
-	state Button
+	State Button
 }
 
 func (AssignableButton6Param) parameterKey() string {
 	return "AssignableButton6"
 }
 func (a AssignableButton6Param) parameterValue() string {
-	return string(a.state)
+	return string(a.State)
 }
 func (AssignableButton6Param) parameterParse(s string) (Parameter, error) {
 	return AssignableButton6Param{Button(s)}, nil
 }
 func (a AssignableButton6Param) Valid() bool {
-	return a.state.Valid()
+	return a.State.Valid()
 }
 func (AssignableButton6Param) _assignableParameter() {}
 
@@ -290,20 +291,20 @@ func init() {
 }
 
 type AssignableButton7Param struct {
-	state Button
+	State Button
 }
 
 func (AssignableButton7Param) parameterKey() string {
 	return "AssignableButton7"
 }
 func (a AssignableButton7Param) parameterValue() string {
-	return string(a.state)
+	return string(a.State)
 }
 func (AssignableButton7Param) parameterParse(s string) (Parameter, error) {
 	return AssignableButton7Param{Button(s)}, nil
 }
 func (a AssignableButton7Param) Valid() bool {
-	return a.state.Valid()
+	return a.State.Valid()
 }
 func (AssignableButton7Param) _assignableParameter() {}
 
@@ -312,20 +313,20 @@ func init() {
 }
 
 type AssignableButton8Param struct {
-	state Button
+	State Button
 }
 
 func (AssignableButton8Param) parameterKey() string {
 	return "AssignableButton8"
 }
 func (a AssignableButton8Param) parameterValue() string {
-	return string(a.state)
+	return string(a.State)
 }
 func (AssignableButton8Param) parameterParse(s string) (Parameter, error) {
 	return AssignableButton8Param{Button(s)}, nil
 }
 func (a AssignableButton8Param) Valid() bool {
-	return a.state.Valid()
+	return a.State.Valid()
 }
 func (AssignableButton8Param) _assignableParameter() {}
 
@@ -334,20 +335,20 @@ func init() {
 }
 
 type AssignableButton9Param struct {
-	state Button
+	State Button
 }
 
 func (AssignableButton9Param) parameterKey() string {
 	return "AssignableButton9"
 }
 func (a AssignableButton9Param) parameterValue() string {
-	return string(a.state)
+	return string(a.State)
 }
 func (AssignableButton9Param) parameterParse(s string) (Parameter, error) {
 	return AssignableButton9Param{Button(s)}, nil
 }
 func (a AssignableButton9Param) Valid() bool {
-	return a.state.Valid()
+	return a.State.Valid()
 }
 func (AssignableButton9Param) _assignableParameter() {}
 
@@ -356,20 +357,20 @@ func init() {
 }
 
 type AssignableButtonFocusHold struct {
-	state Button
+	State Button
 }
 
 func (AssignableButtonFocusHold) parameterKey() string {
 	return "AssignableButtonFocusHold"
 }
 func (a AssignableButtonFocusHold) parameterValue() string {
-	return string(a.state)
+	return string(a.State)
 }
 func (AssignableButtonFocusHold) parameterParse(s string) (Parameter, error) {
 	return AssignableButtonFocusHold{Button(s)}, nil
 }
 func (a AssignableButtonFocusHold) Valid() bool {
-	return a.state.Valid()
+	return a.State.Valid()
 }
 func (AssignableButtonFocusHold) _assignableParameter() {}
 
@@ -1646,4 +1647,76 @@ func (p RecFormatFrequencyParam) _projectParameter() {}
 
 func init() {
 	registerParameter(func() Parameter { return RecFormatFrequencyParam{} })
+}
+
+//
+// Parameters for CameraoperationEndpoint
+//
+
+type Activator string
+
+const (
+	Inactive Activator = "inactive"
+	Active   Activator = "active"
+)
+
+type CamMenuParam struct {
+	On Activator
+}
+
+func (p CamMenuParam) parameterKey() string {
+	return "CamMenu"
+}
+
+func (p CamMenuParam) parameterValue() string {
+	return string(p.On)
+}
+
+func (CamMenuParam) parameterParse(s string) (Parameter, error) {
+	return CamMenuParam{
+		On: Activator(s),
+	}, nil
+}
+
+func (p CamMenuParam) Valid() bool {
+	return p.On == Active || p.On == Inactive
+}
+
+func (p CamMenuParam) _cameraoperationParameter() {}
+
+func init() {
+	registerParameter(func() Parameter { return CamMenuParam{} })
+}
+
+type CamMenuSelectorParam struct {
+	Dir   Direction
+	State Button
+}
+
+func (p CamMenuSelectorParam) parameterKey() string {
+	return "CamMenuSelector"
+}
+
+func (p CamMenuSelectorParam) parameterValue() string {
+	return commaJoin(string(p.Dir), string(p.State))
+}
+
+func (p CamMenuSelectorParam) parameterParse(s string) (Parameter, error) {
+	sp := commaSplit(s)
+	if len(sp) != 2 {
+		return nil, fmt.Errorf("invalid comma-joined-list length: %d, expects 2", len(sp))
+	}
+	p.Dir = Direction(sp[0])
+	p.State = Button(sp[1])
+	return p, nil
+}
+
+func (p CamMenuSelectorParam) Valid() bool {
+	return p.Dir.Valid() && p.State.Valid()
+}
+
+func (p CamMenuSelectorParam) _cameraoperationParameter() {}
+
+func init() {
+	registerParameter(func() Parameter { return CamMenuSelectorParam{} })
 }
