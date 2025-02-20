@@ -14,10 +14,7 @@ import (
 	"strconv"
 	"sync"
 	"sync/atomic"
-	"time"
 )
-
-const networkTimeout = 5 * time.Second
 
 // CameraClient represent a remote camera to be controlled via the AW protocol
 type CameraClient struct {
@@ -29,7 +26,7 @@ type CameraClient struct {
 	// Some variables are adjusted for Panasonic protocol unless explicitly set
 	// before the first request is sent.
 	// CheckRedirects is set func(...) error { return http.ErrUseLastResponse }
-	// Timeout is set to 3 seconds
+	// Timeout is set to 5 seconds
 	Http     http.Client
 	httpOnce sync.Once     // track http initialization
 	dummyCtr atomic.Uint64 // source for dummy cache-disabling numbers
