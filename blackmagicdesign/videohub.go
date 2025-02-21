@@ -50,6 +50,51 @@ func DialVideohub(Addr string) (*VideohubSocket, error) {
 	return v, nil
 }
 
+// VideohubListener is a net.Listener like struct for Videohub devices.
+type VideohubListener struct {
+	listener net.Listener
+}
+
+// ListenVideohub returns a listener for Videohub clients like net.Listen
+func ListenVideohub(Addr string) (*VideohubListener, error) {
+	if Addr == "" {
+		Addr = "0.0.0.0:9990"
+	}
+	if !strings.Contains(Addr, ":") {
+		Addr = Addr + ":9990"
+	}
+	listener, err := net.Listen("tcp4", Addr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to listen for VideoHub: %w", err)
+	}
+	v := &VideohubListener{
+		listener: listener,
+	}
+	return v, nil
+}
+
+// Accept waits for and returns the next Videohub connection to the listener.
+func (l *VideohubListener) Accept() (*VideohubSocket, error) {
+	conn, err := l.listener.Accept()
+	if err != nil {
+		return nil, fmt.Errorf("failed to accept Videohub connection: %w", err)
+	}
+	v := &VideohubSocket{
+		Conn: conn,
+	}
+	return v, nil
+}
+
+// Close closes the VideohubListener, including the underlying net.Listener.
+func (l *VideohubListener) Close() error {
+	return l.listener.Close()
+}
+
+// Addr returns the listener's network address.
+func (l *VideohubListener) Addr() net.Addr {
+	return l.listener.Addr()
+}
+
 // Write writes a VideohubBlock to the connection.
 // Write can be made to time-out by SetDeadline or SetWriteDeadline.
 // See also: net.Conn.Write()
@@ -168,13 +213,15 @@ func newBlock(header string) VideohubBlock {
 	}
 }
 
+type VersionNumber struct {
+	Major int
+	Minor int
+}
+
 // ProtocolPreambleBlock is the first block sent by the Videohub device.
 type ProtocolPreambleBlock struct {
-	Empty   bool     // Indicates an empty block to request information
-	Version struct { // Version of protocol spoken by the Videohub device
-		Major int
-		Minor int
-	}
+	Empty   bool          // Indicates an empty block to request information
+	Version VersionNumber // Version of protocol spoken by the Videohub device
 }
 
 func (ProtocolPreambleBlock) header() string {
@@ -214,7 +261,7 @@ func (k *ProtocolPreambleBlock) dump(b *bytes.Buffer) {
 	if k.Empty {
 		return
 	}
-	b.WriteString("Version:")
+	b.WriteString("Version: ")
 	b.WriteString(strconv.Itoa(k.Version.Major))
 	b.WriteByte('.')
 	b.WriteString(strconv.Itoa(k.Version.Minor))

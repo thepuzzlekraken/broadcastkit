@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"cmp"
 	"iter"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -87,6 +88,7 @@ func orderedIter[K cmp.Ordered, V any](m map[K]V) iter.Seq2[K, V] {
 	for k := range m {
 		keys = append(keys, k)
 	}
+	slices.Sort(keys)
 	return func(yield func(key K, value V) bool) {
 		for _, k := range keys {
 			if !yield(k, m[k]) {
