@@ -4,33 +4,37 @@ import (
 	"bytes"
 	"fmt"
 	"strconv"
+	"strings"
 )
 
-const FaderMin int = -32768 // -Inf
-const FaderMax int = 10000  // +10 dB
-const FaderBase int = 0     // 0 dB
+const DbMin int = -32768 // -Inf
+const DbMax int = 10000  // +10 dB
+const DbZero int = 0     // 0 dB
 
+// StringParam represents a string parameter
 type StringParam struct {
 	Set      bool
-	Address  string
+	Address  AddressString
 	AddressX int
 	AddressY int
 	Value    string
 }
 
-func (p *StringParam) _recv() {}
-func (p *StringParam) _send() {}
+func (p *StringParam) _msg() {}
 
+// IntParam represents an integer parameter
+//
+// Values often represent 1/1000dB, from FaderMin to FaderMax. The exact meaning
+// is determined by the parameter address.
 type IntParam struct {
 	Set      bool
-	Address  string
+	Address  AddressString
 	AddressX int
 	AddressY int
 	Value    int
 }
 
-func (p *IntParam) _recv() {}
-func (p *IntParam) _send() {}
+func (p *IntParam) _msg() {}
 
 func parseParam(line []byte) (Message, error) {
 	l := line
@@ -85,7 +89,7 @@ func parseParam(line []byte) (Message, error) {
 		}
 		return &IntParam{
 			Set:      set,
-			Address:  string(address),
+			Address:  AddressString(address),
 			AddressX: pX,
 			AddressY: pY,
 			Value:    v,
@@ -94,9 +98,49 @@ func parseParam(line []byte) (Message, error) {
 
 	return &StringParam{
 		Set:      set,
-		Address:  string(address),
+		Address:  AddressString(address),
 		AddressX: pX,
 		AddressY: pY,
 		Value:    string(bV),
 	}, nil
 }
+
+// AddressString is a string which represent a Yamaha parameter address.
+//
+// This is a convenience wrapper for enum-like autocomple and type-check.
+type AddressString string
+
+func autoquote(s AddressString) string {
+	if strings.ContainsAny(string(s), " \"") {
+		return fmt.Sprintf("%q", s)
+	}
+	return string(s)
+}
+
+func (a AddressString) String() string {
+	return autoquote(a)
+}
+
+const (
+	ChFaderAddr      AddressString = "MIXER:Current/InCh/Fader/Level"
+	StChFaderAddr    AddressString = "MIXER:Current/StInCh/Fader/Level"
+	ChToMixAddr      AddressString = "MIXER:Current/InCh/ToMix/Level"
+	StChToMixAddr    AddressString = "MIXER:Current/StInCh/ToMix/Level"
+	ChToMatrixAddr   AddressString = "MIXER:Current/InCh/ToMtrx/Level"
+	StChToMatrixAddr AddressString = "MIXER:Current/StInCh/ToMtrx/Level"
+)
+
+// Yamaha CL/QL mixers use both /StIn/ and /StInCh/ for many parameters. They
+// accept either in set/get and send both upon NOTIFY set, presumably for
+// backwards compatibility. Some parameters available via /StInCh/ only.
+// You may wish to drop all /StIn/ notifications to processing overhead.
+//
+//	socket := yamaha.DialSCP("203.0.113.123")
+//	for {
+//		_, msg, _ := socket.Read()
+//		if strings.HasPrefix(msg.Address, LegacyStPrefix) {
+//			continue
+//		}
+//		// process msg normally
+//	}
+const LegacyStPrefix AddressString = "MIXER:Current/StIn/"

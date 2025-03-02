@@ -2,14 +2,16 @@ package yamaha
 
 import "fmt"
 
+// InfoMessage is a special action message within the Yamaha SCP protocol.
+//
+// Most common actions are: devinfo, devicename, devstatus, scpmode
 type InfoMessage struct {
 	Action  string
-	Address string
+	Address AddressString
 	Value   string
 }
 
-func (m *InfoMessage) _recv() {}
-func (m *InfoMessage) _send() {}
+func (m *InfoMessage) _msg() {}
 
 func parseInfo(line []byte) (Message, error) {
 	l := trimSpace(line)
@@ -30,7 +32,7 @@ func parseInfo(line []byte) (Message, error) {
 	}
 	return &InfoMessage{
 		Action:  string(action),
-		Address: string(address),
+		Address: AddressString(address),
 		Value:   string(value),
 	}, nil
 }

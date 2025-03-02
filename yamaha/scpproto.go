@@ -11,99 +11,63 @@ import (
 	"sync"
 )
 
-type MessageCause int
-
-const (
-	ErrorCause  MessageCause = -1
-	Reply       MessageCause = 0
-	Unsolicited MessageCause = 1
-)
-
-func (c MessageCause) String() string {
-	switch c {
-	case ErrorCause:
-		return "ERROR"
-	case Reply:
-		return "OK"
-	case Unsolicited:
-		return "NOTIFY"
-	default:
-		return "UNKNOWN"
-	}
-}
-
+// Message interface is implemented by all messages sendable to a socket.
 type Message interface {
-	_send()
-	_recv()
+	_msg()
 }
-
-type ReceiveMessage interface {
-	_recv()
-}
-
-type ErrorMessage struct {
-	Details string
-}
-
-func (m *ErrorMessage) _recv() {}
 
 type HeartbeatMessage struct{}
 
-func (m *HeartbeatMessage) _recv() {}
-func (m *HeartbeatMessage) _send() {}
+func (m *HeartbeatMessage) _msg() {}
 
-func parseLine(line []byte) (MessageCause, ReceiveMessage, error) {
+func parseLine(line []byte) (bool, Message, error) {
 	l := trimSpace(line)
 
-	var reason MessageCause
+	var unsolicited bool
 	switch {
 	case bytes.HasPrefix(l, []byte("OK")):
-		reason = Reply
+		unsolicited = false
 		l = l[2:]
 	case bytes.HasPrefix(l, []byte("NOTIFY")):
-		reason = Unsolicited
+		unsolicited = true
 		l = l[6:]
 	case bytes.HasPrefix(l, []byte("ERROR")):
-		reason = ErrorCause
-		l = l[5:]
+		return false, nil, fmt.Errorf("yamaha procotol error: %s", string(l[5:]))
 	default:
-		return 0, nil, fmt.Errorf("syntax error: %s, unknown prefix", line)
+		return false, nil, fmt.Errorf("yamaha syntax error: unknown prefix in line: %s", line)
 	}
 
 	if len(l) == 0 || !isSpace(l[0]) {
-		return 0, nil, fmt.Errorf("syntax error: %s, no prefix separator", line)
+		return false, nil, fmt.Errorf("yamaha syntax error: no prefix separator in line: %s", line)
 	}
 	l = trimSpace(l)
 
-	if reason == ErrorCause {
-		// Errors will not be processed further.
-		return ErrorCause, &ErrorMessage{string(l)}, nil
-	}
-
+	action, _ := cutSpace(l) // lookahead to decide param or info
 	switch {
-	case bytes.HasPrefix(l, []byte("get")):
+	case bytes.Equal(action, []byte("get")):
 		fallthrough
-	case bytes.HasPrefix(l, []byte("set")):
+	case bytes.Equal(action, []byte("set")):
 		msg, err := parseParam(l)
-		return reason, msg, err
+		return unsolicited, msg, err
 	default:
 		msg, err := parseInfo(l)
-		return reason, msg, err
+		return unsolicited, msg, err
 	}
 }
 
+// ScpSocket is a connection to a Yamaha mixer via Simple Control Protocol.
+//
+// Yamaha SCP can be communicated over any io.ReadWriter, but typically used
+// over TCP via DialSCP
+//
+// ScpSocket must not be copied after first use.
+// ScpSocket is safe to use from multiple goroutines.
+// Conn must not be used directly after the first call to ScpSocket.
 type ScpSocket struct {
-	Conn net.Conn
+	Conn io.ReadWriter
 
 	rlock sync.Mutex
 	scan  *bufio.Scanner
-}
-
-func autoquote(s string) string {
-	if strings.ContainsAny(s, " \"") {
-		return fmt.Sprintf("%q", s)
-	}
-	return s
 }
 
 func (c *ScpSocket) Write(msg Message) error {
@@ -140,7 +104,12 @@ func (c *ScpSocket) Write(msg Message) error {
 	return err
 }
 
-func (c *ScpSocket) Read() (MessageCause, ReceiveMessage, error) {
+// Read reads a single Message from the socket.
+//
+// bool indicates if the message is an unsolicited nofication (true) or a reply (false)
+// Message is the message content received
+// error indicates any errors, including error messages sent by the mixer
+func (c *ScpSocket) Read() (bool, Message, error) {
 	c.rlock.Lock()
 	defer c.rlock.Unlock()
 	if c.scan == nil {
@@ -152,18 +121,19 @@ func (c *ScpSocket) Read() (MessageCause, ReceiveMessage, error) {
 		if err == nil {
 			err = io.EOF
 		}
-		return 0, nil, fmt.Errorf("ScpSocket.Read failed: %w", err)
+		return false, nil, fmt.Errorf("yamaha.ScpSocket.Read failed: %w", err)
 	}
 
 	l := c.scan.Bytes()
 	bytes.Trim(l, whitespaces)
 	if len(l) == 0 {
-		return Reply, &HeartbeatMessage{}, nil
+		return false, &HeartbeatMessage{}, nil
 	}
 
 	return parseLine(l)
 }
 
+// DialSCP connects to a Yamaha mixer via TCP and returns an ScpSocket.
 func DialSCP(addr string) (*ScpSocket, error) {
 	if !strings.Contains(addr, ":") {
 		addr = addr + ":49280"
