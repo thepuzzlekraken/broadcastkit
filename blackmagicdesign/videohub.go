@@ -14,7 +14,7 @@ import (
 // VideohubSocket is a wrapper for the Blackmagic Videohub protocol.
 // Use VideohubDial to create a new connection.
 type VideohubSocket struct {
-	Conn  io.ReadWriter
+	Conn  io.ReadWriteCloser
 	rlock sync.Mutex
 	scan  *bufio.Scanner
 }
@@ -42,7 +42,7 @@ func DialVideohub(Addr string) (*VideohubSocket, error) {
 	}
 	conn, err := net.Dial("tcp4", Addr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to VideoHub: %w", err)
+		return nil, fmt.Errorf("broadcastkit/yamaha: connect: %w", err)
 	}
 	v := &VideohubSocket{
 		Conn: conn,
@@ -65,7 +65,7 @@ func ListenVideohub(Addr string) (*VideohubListener, error) {
 	}
 	listener, err := net.Listen("tcp4", Addr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to listen for VideoHub: %w", err)
+		return nil, fmt.Errorf("broadcastkit/blackmagicdesign: listen: %w", err)
 	}
 	v := &VideohubListener{
 		listener: listener,
@@ -77,7 +77,7 @@ func ListenVideohub(Addr string) (*VideohubListener, error) {
 func (l *VideohubListener) Accept() (*VideohubSocket, error) {
 	conn, err := l.listener.Accept()
 	if err != nil {
-		return nil, fmt.Errorf("failed to accept Videohub connection: %w", err)
+		return nil, fmt.Errorf("broadcastkit/blackmagicdesign: accept: %w", err)
 	}
 	v := &VideohubSocket{
 		Conn: conn,
@@ -106,12 +106,13 @@ func (c *VideohubSocket) Write(m VideohubBlock) error {
 	buf.WriteByte('\n')
 	_, err := c.Conn.Write(buf.Bytes())
 	if err != nil {
-		return fmt.Errorf("VideohubConn.Write failed: %w", err)
+		return fmt.Errorf("broadcastkit/blackmagicdesign: socket write: %w", err)
 	}
 	return nil
 }
 
 // Read reads a VideohubBlock from the connection.
+//
 // Read maintains an internal buffer, and will block until a complete block is
 // available. For unrecognized blocks, an UnknownBlock{} is returned.
 // ACK and NAK messages are treated as complete blocks and returned immediately.
@@ -127,10 +128,13 @@ func (c *VideohubSocket) Read() (VideohubBlock, error) {
 	for {
 		if !c.scan.Scan() {
 			err := c.scan.Err()
-			if err == nil {
+			if err != nil {
+				// non-EOF scanner errors are not recoverable
+				c.Conn.Close()
+			} else {
 				err = io.EOF
 			}
-			return nil, fmt.Errorf("VideohubConn.Read failed: %w", err)
+			return nil, fmt.Errorf("broadcastkit/blackmagicdesign: socket scan: %w", err)
 		}
 
 		r := c.scan.Bytes()
@@ -154,11 +158,16 @@ func (c *VideohubSocket) Read() (VideohubBlock, error) {
 
 		err := msg.parse(body)
 		if err != nil {
-			return msg, fmt.Errorf("VideohubConn.Read failed: %w", err)
+			return msg, fmt.Errorf("broadcastkit/blackmagicdesign: socket parse: %w", err)
 		}
 
 		return msg, nil
 	}
+}
+
+// Close closes the VideohubSocket, including the underlying net.Conn.
+func (c *VideohubSocket) Close() error {
+	return c.Conn.Close()
 }
 
 // newBlock returns the specific block struct for a given header
@@ -633,7 +642,7 @@ func (r *Routing) parse(b []byte) error {
 	}
 	*r = c
 	if bytes.Count(b, []byte("\n")) != len(c) {
-		return fmt.Errorf("partial routing received")
+		return fmt.Errorf("partially-valid routing block")
 	}
 	return nil
 }

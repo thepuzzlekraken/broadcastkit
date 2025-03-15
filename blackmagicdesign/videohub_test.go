@@ -8,7 +8,15 @@ import (
 	"testing"
 )
 
-func testRead(buf *bytes.Buffer, msg []VideohubBlock, t *testing.T) {
+type closerBuffer struct {
+	bytes.Buffer
+}
+
+func (c *closerBuffer) Close() error {
+	return nil
+}
+
+func testRead(buf *closerBuffer, msg []VideohubBlock, t *testing.T) {
 	v := VideohubSocket{
 		Conn: buf,
 	}
@@ -28,11 +36,14 @@ func testRead(buf *bytes.Buffer, msg []VideohubBlock, t *testing.T) {
 }
 
 func TestVideohubScoket_Read(t *testing.T) {
-	testRead(bytes.NewBuffer(testSmoke), testBacon, t)
+	buf := &closerBuffer{
+		*bytes.NewBuffer(testSmoke),
+	}
+	testRead(buf, testBacon, t)
 }
 
 func TestVideohubSocket_Write(t *testing.T) {
-	buf := new(bytes.Buffer)
+	buf := &closerBuffer{}
 	v := VideohubSocket{
 		Conn: buf,
 	}

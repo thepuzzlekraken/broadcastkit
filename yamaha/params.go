@@ -41,51 +41,51 @@ func parseParam(line []byte) (Message, error) {
 	action, l := cutSpace(l)
 	set := bytes.Equal(action, []byte("set"))
 	if !set && !bytes.Equal(action, []byte("get")) {
-		return nil, fmt.Errorf("syntax error: %s, invalid action", line)
+		return nil, fmt.Errorf("broadcastkit/yamaha: invalid action: %s", line)
 	}
 
 	address, l := cutWord(l)
 	if len(address) == 0 {
-		return nil, fmt.Errorf("syntax error: %s, missing address", line)
+		return nil, fmt.Errorf("broadcastkit/yamaha: syntax: missing address: %s", line)
 	}
 
 	if !startsSpace(l) {
-		return nil, fmt.Errorf("syntax error: %s, missing separator", line)
+		return nil, fmt.Errorf("broadcastkit/yamaha: syntax: missing address separator: %s", line)
 	}
 	bX, l := cutSpace(l)
 	if len(bX) == 0 {
-		return nil, fmt.Errorf("syntax error: %s, missing x parameter", line)
+		return nil, fmt.Errorf("broadcastkit/yamaha: syntax: missing x parameter: %s", line)
 	}
 	pX, err := strconv.Atoi(string(bX))
 	if err != nil {
-		return nil, fmt.Errorf("syntax error: %s, x parameter not a number", line)
+		return nil, fmt.Errorf("broadcastkit/yamaha: syntax: x parameter not a number: %s", line)
 	}
 
 	if !startsSpace(l) {
-		return nil, fmt.Errorf("syntax error: %s, missing separator", line)
+		return nil, fmt.Errorf("broadcastkit/yamaha: syntax: missing x-y separator: %s", line)
 	}
 	bY, l := cutSpace(l)
 	if len(bX) == 0 {
-		return nil, fmt.Errorf("syntax error: %s, missing y parameter", line)
+		return nil, fmt.Errorf("broadcastkit/yamaha: syntax: missing y parameter: %s", line)
 	}
 	pY, err := strconv.Atoi(string(bY))
 	if err != nil {
-		return nil, fmt.Errorf("syntax error: %s, y parameter not a number", line)
+		return nil, fmt.Errorf("broadcastkit/yamaha: syntax: y parameter not a number: %s", line)
 	}
 
 	// TODO(zsh): For Yamaha emulation, support required for missing values.
 	if !startsSpace(l) {
-		return nil, fmt.Errorf("syntax error: %s, missing separator", line)
+		return nil, fmt.Errorf("broadcastkit/yamaha: syntax: missing parameter separator: %s", line)
 	}
 	bV, _ := cutWord(l)
 	if len(bV) == 0 {
-		return nil, fmt.Errorf("syntax error: %s, missing value", line)
+		return nil, fmt.Errorf("broadcastkit/yamaha: syntax: missing value: %s", line)
 	}
 
 	if l[0] != '"' {
 		v, err := strconv.Atoi(string(bV))
 		if err != nil {
-			return nil, fmt.Errorf("syntax error: %s, value not a number", line)
+			return nil, fmt.Errorf("broadcastkit/yamaha: syntax: value not a number: %s", line)
 		}
 		return &IntParam{
 			Set:      set,

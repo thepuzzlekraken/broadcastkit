@@ -32,13 +32,13 @@ func parseLine(line []byte) (bool, Message, error) {
 		unsolicited = true
 		l = l[6:]
 	case bytes.HasPrefix(l, []byte("ERROR")):
-		return false, nil, fmt.Errorf("yamaha procotol error: %s", string(l[5:]))
+		return false, nil, fmt.Errorf("broadcastkit/yamaha: protocol error: %s", string(l[5:]))
 	default:
-		return false, nil, fmt.Errorf("yamaha syntax error: unknown prefix in line: %s", line)
+		return false, nil, fmt.Errorf("broadcastkit/yamaha: syntax: invalid prefix: %s", line)
 	}
 
 	if len(l) == 0 || !isSpace(l[0]) {
-		return false, nil, fmt.Errorf("yamaha syntax error: no prefix separator in line: %s", line)
+		return false, nil, fmt.Errorf("broadcastkit/yamaha: syntax: missing prefix separator: %s", line)
 	}
 	l = trimSpace(l)
 
@@ -64,7 +64,7 @@ func parseLine(line []byte) (bool, Message, error) {
 // ScpSocket is safe to use from multiple goroutines.
 // Conn must not be used directly after the first call to ScpSocket.
 type ScpSocket struct {
-	Conn io.ReadWriter
+	Conn io.ReadWriteCloser
 
 	rlock sync.Mutex
 	scan  *bufio.Scanner
@@ -72,7 +72,7 @@ type ScpSocket struct {
 
 func (c *ScpSocket) Write(msg Message) error {
 	if c.Conn == nil {
-		return errors.New("connection not established")
+		return errors.New("broadcastkit/yamaha: connection not established")
 	}
 	var buf bytes.Buffer
 	switch msg := msg.(type) {
@@ -98,7 +98,7 @@ func (c *ScpSocket) Write(msg Message) error {
 		}
 	default:
 		// This should be impossible due to the interface constraints.
-		panic(fmt.Sprintf("invalid ScpSocket.Write message type: %T", msg))
+		panic(fmt.Sprintf("broadcastkit/yamaha: invalid Message type: %T", msg))
 	}
 	_, err := c.Conn.Write(buf.Bytes())
 	return err
@@ -118,10 +118,13 @@ func (c *ScpSocket) Read() (bool, Message, error) {
 
 	if !c.scan.Scan() {
 		err := c.scan.Err()
-		if err == nil {
+		if err != nil {
+			// non-EOF scanner errors are non-recoverable
+			c.Conn.Close()
+		} else {
 			err = io.EOF
 		}
-		return false, nil, fmt.Errorf("yamaha.ScpSocket.Read failed: %w", err)
+		return false, nil, fmt.Errorf("broadcastkit/yamaha: scan: %w", err)
 	}
 
 	l := c.scan.Bytes()
@@ -131,6 +134,10 @@ func (c *ScpSocket) Read() (bool, Message, error) {
 	}
 
 	return parseLine(l)
+}
+
+func (c *ScpSocket) Close() error {
+	return c.Conn.Close()
 }
 
 // DialSCP connects to a Yamaha mixer via TCP and returns an ScpSocket.
