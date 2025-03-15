@@ -128,6 +128,8 @@ const (
 	StChToMixAddr    AddressString = "MIXER:Current/StInCh/ToMix/Level"
 	ChToMatrixAddr   AddressString = "MIXER:Current/InCh/ToMtrx/Level"
 	StChToMatrixAddr AddressString = "MIXER:Current/StInCh/ToMtrx/Level"
+	MixFaderAddr     AddressString = "MIXER:Current/Mix/Fader/Level"
+	MatrixFaderAddr  AddressString = "MIXER:Current/Mtrx/Fader/Level"
 )
 
 // Yamaha CL/QL mixers use both /StIn/ and /StInCh/ for many parameters. They
