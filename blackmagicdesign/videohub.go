@@ -42,7 +42,7 @@ func DialVideohub(Addr string) (*VideohubSocket, error) {
 	}
 	conn, err := net.Dial("tcp4", Addr)
 	if err != nil {
-		return nil, fmt.Errorf("broadcastkit/yamaha: connect: %w", err)
+		return nil, err
 	}
 	v := &VideohubSocket{
 		Conn: conn,
@@ -65,7 +65,7 @@ func ListenVideohub(Addr string) (*VideohubListener, error) {
 	}
 	listener, err := net.Listen("tcp4", Addr)
 	if err != nil {
-		return nil, fmt.Errorf("broadcastkit/blackmagicdesign: listen: %w", err)
+		return nil, err
 	}
 	v := &VideohubListener{
 		listener: listener,
@@ -77,7 +77,7 @@ func ListenVideohub(Addr string) (*VideohubListener, error) {
 func (l *VideohubListener) Accept() (*VideohubSocket, error) {
 	conn, err := l.listener.Accept()
 	if err != nil {
-		return nil, fmt.Errorf("broadcastkit/blackmagicdesign: accept: %w", err)
+		return nil, err
 	}
 	v := &VideohubSocket{
 		Conn: conn,
@@ -134,7 +134,7 @@ func (c *VideohubSocket) Read() (VideohubBlock, error) {
 			} else {
 				err = io.EOF
 			}
-			return nil, fmt.Errorf("broadcastkit/blackmagicdesign: socket scan: %w", err)
+			return nil, fmt.Errorf("broadcastkit/blackmagicdesign: videohub scan: %w", err)
 		}
 
 		r := c.scan.Bytes()
@@ -158,7 +158,7 @@ func (c *VideohubSocket) Read() (VideohubBlock, error) {
 
 		err := msg.parse(body)
 		if err != nil {
-			return msg, fmt.Errorf("broadcastkit/blackmagicdesign: socket parse: %w", err)
+			return msg, fmt.Errorf("broadcastkit/blackmagicdesign: videohub parse: %w", err)
 		}
 
 		return msg, nil
@@ -250,16 +250,16 @@ func (k *ProtocolPreambleBlock) parse(b []byte) error {
 			// trying to avoid depending on regexes
 			ma, mi, ok := bytes.Cut(d, []byte("."))
 			if !ok {
-				return fmt.Errorf("malformed version in Videohub preamble")
+				return fmt.Errorf("malformed version in preamble")
 			}
 			var err error
 			k.Version.Major, err = strconv.Atoi(string(ma))
 			if err != nil {
-				return fmt.Errorf("malformed major version in Videohub preamble: %w", err)
+				return fmt.Errorf("malformed major version in preamble: %w", err)
 			}
 			k.Version.Minor, err = strconv.Atoi(string(mi))
 			if err != nil {
-				return fmt.Errorf("malformed minor version in Videohub preamble: %w", err)
+				return fmt.Errorf("malformed minor version in preamble: %w", err)
 			}
 		}
 	}

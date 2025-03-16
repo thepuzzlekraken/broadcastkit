@@ -23,22 +23,22 @@ func (m *HeartbeatMessage) _msg() {}
 func parseLine(line []byte) (bool, Message, error) {
 	l := trimSpace(line)
 
-	var unsolicited bool
+	var reply bool
 	switch {
 	case bytes.HasPrefix(l, []byte("OK")):
-		unsolicited = false
+		reply = true
 		l = l[2:]
 	case bytes.HasPrefix(l, []byte("NOTIFY")):
-		unsolicited = true
+		reply = false
 		l = l[6:]
 	case bytes.HasPrefix(l, []byte("ERROR")):
-		return false, nil, fmt.Errorf("broadcastkit/yamaha: protocol error: %s", string(l[5:]))
+		return true, nil, fmt.Errorf("yamaha protocol error: %s", string(l[5:]))
 	default:
-		return false, nil, fmt.Errorf("broadcastkit/yamaha: syntax: invalid prefix: %s", line)
+		return false, nil, fmt.Errorf("yamaha syntax: invalid prefix: %s", line)
 	}
 
 	if len(l) == 0 || !isSpace(l[0]) {
-		return false, nil, fmt.Errorf("broadcastkit/yamaha: syntax: missing prefix separator: %s", line)
+		return false, nil, fmt.Errorf("yamaha syntax: missing prefix separator: %s", line)
 	}
 	l = trimSpace(l)
 
@@ -48,10 +48,10 @@ func parseLine(line []byte) (bool, Message, error) {
 		fallthrough
 	case bytes.Equal(action, []byte("set")):
 		msg, err := parseParam(l)
-		return unsolicited, msg, err
+		return reply, msg, err
 	default:
 		msg, err := parseInfo(l)
-		return unsolicited, msg, err
+		return reply, msg, err
 	}
 }
 
@@ -106,7 +106,7 @@ func (c *ScpSocket) Write(msg Message) error {
 
 // Read reads a single Message from the socket.
 //
-// bool indicates if the message is an unsolicited nofication (true) or a reply (false)
+// bool indicates if the message is a reply (true) or unsolicited information (false)
 // Message is the message content received
 // error indicates any errors, including error messages sent by the mixer
 func (c *ScpSocket) Read() (bool, Message, error) {
