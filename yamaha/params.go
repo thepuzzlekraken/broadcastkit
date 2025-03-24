@@ -82,7 +82,7 @@ func parseParam(line []byte) (Message, error) {
 		return nil, fmt.Errorf("broadcastkit/yamaha: syntax: missing value: %s", line)
 	}
 
-	if l[0] != '"' {
+	if l = trimSpace(l); l[0] != '"' {
 		v, err := strconv.Atoi(string(bV))
 		if err != nil {
 			return nil, fmt.Errorf("broadcastkit/yamaha: syntax: value not a number: %s", line)
