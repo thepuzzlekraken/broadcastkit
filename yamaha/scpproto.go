@@ -25,6 +25,9 @@ func parseLine(line []byte) (bool, Message, error) {
 
 	var reply bool
 	switch {
+	case bytes.HasPrefix(l, []byte("OKm")):
+		reply = true
+		l = l[3:]
 	case bytes.HasPrefix(l, []byte("OK")):
 		reply = true
 		l = l[2:]
