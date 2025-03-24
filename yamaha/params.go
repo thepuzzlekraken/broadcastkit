@@ -130,6 +130,27 @@ const (
 	StChToMatrixAddr AddressString = "MIXER:Current/StInCh/ToMtrx/Level"
 	MixFaderAddr     AddressString = "MIXER:Current/Mix/Fader/Level"
 	MatrixFaderAddr  AddressString = "MIXER:Current/Mtrx/Fader/Level"
+	MixToMatrixAddr  AddressString = "MIXER:Current/Mix/ToMtrx/Level"
+	ChNameAddr       AddressString = "MIXER:Current/InCh/Label/Name"
+	StChNameAddr     AddressString = "MIXER:Current/StInCh/Label/Name"
+	MixNameAddr      AddressString = "MIXER:Current/Mix/Label/Name"
+	MatrixNameAddr   AddressString = "MIXER:Current/Mtrx/Label/Name"
+	ChColorAddr      AddressString = "MIXER:Current/InCh/Label/Color"
+	StChColorAddr    AddressString = "MIXER:Current/StInCh/Label/Color"
+	MixColorAddr     AddressString = "MIXER:Current/Mix/Label/Color"
+	MatrixColorAddr  AddressString = "MIXER:Current/Mtrx/Label/Color"
+)
+
+const (
+	Blue    string = "Blue"
+	Orange  string = "Orange"
+	Yellow  string = "Yellow"
+	Purple  string = "Purple"
+	Cyan    string = "Cyan"
+	Magenta string = "Magenta"
+	Red     string = "Red"
+	Green   string = "Green"
+	Off     string = "Off"
 )
 
 // Yamaha CL/QL mixers use both /StIn/ and /StInCh/ for many parameters. They
