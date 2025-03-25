@@ -122,6 +122,7 @@ func (a AddressString) String() string {
 }
 
 const (
+	MasterFaderAddr  AddressString = "MIXER:Current/St/Fader/Level"
 	ChFaderAddr      AddressString = "MIXER:Current/InCh/Fader/Level"
 	StChFaderAddr    AddressString = "MIXER:Current/StInCh/Fader/Level"
 	ChToMixAddr      AddressString = "MIXER:Current/InCh/ToMix/Level"
