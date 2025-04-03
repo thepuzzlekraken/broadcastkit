@@ -77,12 +77,14 @@ func parseParam(line []byte) (Message, error) {
 	if !startsSpace(l) {
 		return nil, fmt.Errorf("broadcastkit/yamaha: syntax: missing parameter separator: %s", line)
 	}
-	bV, _ := cutWord(l)
-	if len(bV) == 0 {
+
+	l = trimSpace(l)
+	if len(l) == 0 {
 		return nil, fmt.Errorf("broadcastkit/yamaha: syntax: missing value: %s", line)
 	}
+	bV, _ := cutWord(l)
 
-	if l = trimSpace(l); l[0] != '"' {
+	if l[0] != '"' {
 		v, err := strconv.Atoi(string(bV))
 		if err != nil {
 			return nil, fmt.Errorf("broadcastkit/yamaha: syntax: value not a number: %s", line)
