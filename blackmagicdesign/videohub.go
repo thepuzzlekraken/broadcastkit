@@ -183,6 +183,8 @@ func newBlock(header string) VideohubBlock {
 		return &AckBlock{}
 	case NakBlock{}.header():
 		return &NakBlock{}
+	case PingBlock{}.header():
+		return &PingBlock{}
 	case InputLabelsBlock{}.header():
 		return &InputLabelsBlock{}
 	case OutputLabelsBlock{}.header():
