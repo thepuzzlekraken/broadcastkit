@@ -146,14 +146,14 @@ func (s *SwitcherClient) SwitchBus(bus Bus, src Source) error {
 
 func (s *SwitcherClient) QueryBus(bus Bus) (Source, error) {
 	param := fmt.Sprintf("%02d", bus)
-	res, err := s.command("QBUS:" + param)
+	res, err := s.command("QBSC:" + param)
 	if err != nil {
 		return 0, err
 	}
-	if !strings.HasPrefix(res, "ABUS:"+param) {
+	if !strings.HasPrefix(res, "ABSC:"+param+":") {
 		return 0, fmt.Errorf("unexpected switcher response to QBUS: %s", res)
 	}
-	src, err := strconv.Atoi(res[len(param)+5:])
+	src, err := strconv.Atoi(res[len(param)+6:])
 	if err != nil {
 		return 0, err
 	}
