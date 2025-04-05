@@ -111,7 +111,7 @@ func (s *SwitcherClient) command(send string) (string, error) {
 		// This workaround only works because the bad errors are in the same
 		// tcp message as the ACK above
 		if strings.HasPrefix(recv, "\x02EROR:") {
-			c, err := strconv.Atoi(recv[5:])
+			c, err := strconv.Atoi(recv[6 : len(recv)-1])
 			if err != nil {
 				return "", SwitcherError{code: -1}
 			}
