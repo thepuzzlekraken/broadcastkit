@@ -1720,3 +1720,70 @@ func (p CamMenuSelectorParam) _cameraoperationParameter() {}
 func init() {
 	registerParameter(func() Parameter { return CamMenuSelectorParam{} })
 }
+
+type MediaRecordingParam struct {
+	Recording Button
+}
+
+func (p MediaRecordingParam) parameterKey() string {
+	return "MediaRecording"
+}
+
+func (p MediaRecordingParam) parameterValue() string {
+	return string(p.Recording)
+}
+
+func (MediaRecordingParam) parameterParse(s string) (Parameter, error) {
+	return MediaRecordingParam{
+		Recording: Button(s),
+	}, nil
+}
+
+func (p MediaRecordingParam) Valid() bool {
+	return p.Recording.Valid()
+}
+
+func (p MediaRecordingParam) _cameraoperationParameter() {}
+
+func init() {
+	registerParameter(func() Parameter { return MediaRecordingParam{} })
+}
+
+type RecordingStatus string
+
+const (
+	RecordingRec     RecordingStatus = "rec"
+	RecordingStandby RecordingStatus = "standby"
+)
+
+func (p RecordingStatus) Valid() bool {
+	return p == RecordingRec || p == RecordingStandby
+}
+
+type MediaRecordingStatusParam struct {
+	Status RecordingStatus
+}
+
+func (p MediaRecordingStatusParam) parameterKey() string {
+	return "MediaRecordingStatus"
+}
+
+func (p MediaRecordingStatusParam) parameterValue() string {
+	return string(p.Status)
+}
+
+func (MediaRecordingStatusParam) parameterParse(s string) (Parameter, error) {
+	return MediaRecordingStatusParam{
+		Status: RecordingStatus(s),
+	}, nil
+}
+
+func (p MediaRecordingStatusParam) Valid() bool {
+	return p.Status.Valid()
+}
+
+func (p MediaRecordingStatusParam) _cameraoperationParameter() {}
+
+func init() {
+	registerParameter(func() Parameter { return MediaRecordingStatusParam{} })
+}
