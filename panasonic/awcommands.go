@@ -596,10 +596,10 @@ func (a AWPanTilt) packResponse() string {
 // ScaleUnit indicates a position on a preset scale
 //
 // Zero is the "near-end" of the range: as near-focus, wide-angle, closed-iris
-// 4095 is the "far-end" of the range: as far-focus, tele-angle, open-iris
+// 2730 is the "far-end" of the range: as far-focus, tele-angle, open-iris
 type ScaleUnit int
 
-const ScaleUnitMax ScaleUnit = 4095
+const ScaleUnitMax ScaleUnit = 2730
 
 func (s ScaleUnit) toWire() string {
 	if s > ScaleUnitMax {
