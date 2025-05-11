@@ -4640,3 +4640,88 @@ func (a AWPinPDisplayPosQuery) unpackRequest(_ string) AWRequest {
 func (a AWPinPDisplayPosQuery) packRequest() string {
 	return "#PD"
 }
+
+type AWWiperControlBasic struct {
+	Enabled Toggle
+}
+
+func init() { registerRequest(func() AWRequest { return AWWiperControlBasic{} }) }
+func init() { registerResponse(func() AWResponse { return AWWiperControlBasic{} }) }
+func (a AWWiperControlBasic) Acceptable() bool {
+	return a.Enabled.Acceptable()
+}
+func (a AWWiperControlBasic) Response() AWResponse {
+	return a
+}
+func (a AWWiperControlBasic) requestSignature() string {
+	return "#D8\x02"
+}
+func (a AWWiperControlBasic) unpackRequest(cmd string) AWRequest {
+	a.Enabled = toToggle(cmd[3:4])
+	return a
+}
+func (a AWWiperControlBasic) packRequest() string {
+	return "#D8" + a.Enabled.toWire()
+}
+func (a AWWiperControlBasic) responseSignature() string {
+	return "d8\x02"
+}
+func (a AWWiperControlBasic) unpackResponse(cmd string) AWResponse {
+	a.Enabled = toToggle(cmd[2:3])
+	return a
+}
+func (a AWWiperControlBasic) packResponse() string {
+	return "d8" + a.Enabled.toWire()
+}
+
+type WiperSpeed int
+
+const (
+	WiperOff  WiperSpeed = 0
+	WiperLow  WiperSpeed = 1
+	WiperFast WiperSpeed = 2
+)
+
+func (w WiperSpeed) Acceptable() bool {
+	return w >= WiperOff && w <= WiperFast
+}
+
+func (w WiperSpeed) toWire() string {
+	return int2dec(int(w), 1)
+}
+func toWiperSpeed(s string) WiperSpeed {
+	return WiperSpeed(dec2int(s))
+}
+
+type AWWiperControl struct {
+	Speed WiperSpeed
+}
+
+func init() { registerRequest(func() AWRequest { return AWWiperControl{} }) }
+func init() { registerResponse(func() AWResponse { return AWWiperControl{} }) }
+func (a AWWiperControl) Acceptable() bool {
+	return a.Speed.Acceptable()
+}
+func (a AWWiperControl) Response() AWResponse {
+	return a
+}
+func (a AWWiperControl) requestSignature() string {
+	return "#WIP\x02"
+}
+func (a AWWiperControl) unpackRequest(cmd string) AWRequest {
+	a.Speed = toWiperSpeed(cmd[4:5])
+	return a
+}
+func (a AWWiperControl) packRequest() string {
+	return "#WIP" + a.Speed.toWire()
+}
+func (a AWWiperControl) responseSignature() string {
+	return "wIP\x02"
+}
+func (a AWWiperControl) unpackResponse(cmd string) AWResponse {
+	a.Speed = toWiperSpeed(cmd[3:4])
+	return a
+}
+func (a AWWiperControl) packResponse() string {
+	return "wIP" + a.Speed.toWire()
+}
